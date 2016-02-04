@@ -67,7 +67,7 @@ TestEnvironentDependenciesAssert(){
   ! TestDependenciesScanSuccess 'Testdependency_define_Bash'            '4.2'   && depndSuccess='false'
   ! TestDependenciesScanSuccess 'dkrcp_dependency_dkrcp'                '0.5'   && depndSuccess='false'
   ! TestLocalRepositoryIsEmpty && depndSuccess='false'
-  ! $depndSuccess && ScriptUnwind "$LINENO" "Dected problematic dependencies.  Repair or try '--no-depnd'."
+  ! $depndSuccess && ScriptUnwind "$LINENO" "Detected problematic dependencies.  Repair or try '--no-depnd'."
   true
 }
 ###############################################################################
@@ -1147,34 +1147,6 @@ PipeFailCheck 'image_name_Prepend '"'$TEST_NAME_SPACE'"' | image_Iterator' "$LIN
 ##    Tests definitions.
 ##
 ###############################################################################
-dkrcp_test_1() {
-  host_file_Def(){
-    echo "'a'      'file_content_reflect_name'"
-    echo "'output' 'file_content_dir_create'"
-  }
-  image_reference_Def(){
-    echo "'NameLocal' 'test_1'"
-    echo "'NameLocal' 'test_1:good'"
-  }
-  dkrcp_test_Desc() {
-    echo "Create an image by copying a single host file into it. The host" \
-         "and target files are identical.  The target file should exist "  \
-         "in the root directory of the image."
-  }
-  dkrcp_test_EnvCheck() {
-    host_file_ExistCheck "$1"
-    image_ExistCheck "$1"
-  }
-  dkrcp_test_Run() {
-    host_file_CreateAssert
-#    dkrcp_host_imageAssert 'a' 'f' 'test_1:' 'a' 
-    dkrcp_host_imageAssert 'a' 'f' 'test_1:' 'a' 
-  }
-  dkrcp_test_EnvClean() {
-    host_file_Clean
-    image_Clean
-  }
-}
 ###############################################################################
 dkrcp_test_2() {
   host_file_Def(){

@@ -1,4 +1,5 @@
 #TODO: conurrently run tests.
+#TODO: Determine if detection pipeline functions for scanning are still necessary
 ##############################################################################
 ##
 ##  Purpose:
@@ -222,7 +223,6 @@ TestSelectSpecificationApply(){
 VirtCmmdExecute(){
   local argOptList_ref="$1"
   local argOptMap_ref="$2"
-
   # assert testing dependencies are sufficient to support testing environment
   local -r ignoreDepend="`AssociativeMapAssignIndirect "$argOptMap_ref" '--no-depnd'`"
   if ! $ignoreDepend; then
@@ -236,7 +236,6 @@ VirtCmmdExecute(){
   fi
   local regexArgList="`OptionsArgsGen 'regexList' 'regexExpressMap'`"
   regexArgList="${regexArgList:4}"
-#  ScriptDebug "$LINENO" "regexArgList:'$regexArgList'"
   local -r ignoreScan="`AssociativeMapAssignIndirect "$argOptMap_ref" '--no-scan'`"
   if ! $ignoreScan; then
     eval TestEnvironmentAssert $regexArgList
@@ -276,21 +275,21 @@ VirtCmmdExecute(){
 ##
 ###############################################################################
 TestEnvironmentAssert(){
-  local remnantDetected='false'
   ScriptInform "Scanning: Start: Test Environment for remnants."
   local regexArgs
   args_single_quote_Encapsulate 'regexArgs' "$@"
-#  ScriptDebug "$LINENO" "regexArgs: $regexArgs"
-  PipeFailCheck 'TestSelect '"$regexArgs"' | TestFunctionExecTemplate '"'EnvCheck' 'remnantDetected'" "$LINENO" "Failed environment scan."
-  ScriptInform "Scanning: Complete: Test Environment for remnants."       
-  if $remnantDetected; then
+  if ! ( PipeFailCheck 'TestSelect '"$regexArgs"' | TestFunctionExecTemplate AtEndNotify EnvCheck '  "$LINENO" "Failed environment scan."); then
     ScriptError 'One or more remnants were detected during the scan.'
     ScriptError 'Check to ensure remnants refer to test artifacts.'
     ScriptError 'If the remnants are unwanted test artifacts, rerun specifying'
     ScriptError '"'"--no-check"'" option to delete them before executing'
     ScriptError 'a specific test.'
-    ScriptUnwind "$LINENO" "Scan detected artifacts in environment that are or overlap ones produced during testing."
+    ScriptUnwind "$LINENO" "Scan detected artifacts in environment that overlap ones produced during testing."
   fi
+  ScriptInform "Scanning: Complete: Test Environment for remnants."
+}
+ScriptDetectNotify(){
+  ScriptError 'Detected existence of '"$1"
 }
 ##############################################################################
 ##
@@ -318,7 +317,7 @@ TestEnvironmentClean(){
   ScriptInform "Cleaning: Start: Test Environment of remnants."
   local regexArgs
   args_single_quote_Encapsulate 'regexArgs' "$@"      
-  PipeFailCheck 'TestSelect '"$regexArgs"' | TestFunctionExecTemplate '"'EnvClean'"  "$LINENO" "Failed environment clean."
+  PipeFailCheck 'TestSelect '"$regexArgs"' | TestFunctionExecTemplate ImmediateNotify EnvClean'  "$LINENO" "Failed environment clean."
   ScriptInform "Cleaning: Complete: Test Environment of remnants."
 }
 ##############################################################################
@@ -327,8 +326,12 @@ TestEnvironmentClean(){
 ##    Template function to execute a single testing method.
 ##
 ##  Input:
-##    $1    - Test method name to execute.
-##    $2-$N - Arguments to pass to the test method.
+##    $1    - Error notify response:
+##            'AtEndNotify' - When error continue processing but generate
+##                            error at end.
+##            'ImmediateNotify - When error terminate processing immediately.
+##    $2    - Test method name to execute.
+##    $3-$N - Arguments to pass to the test method.
 ##    STDIN - Stream of Test function names.
 ##
 ##  Output:
@@ -336,16 +339,25 @@ TestEnvironmentClean(){
 ##
 ###############################################################################
 TestFunctionExecTemplate(){
-  local -r funcToExecute="$1"
+  local -r notifyWhen="$1"
+  local -r funcToExecute="$2"
+  local errorInd='false'
   local testFunctionName
   while read testFunctionName; do
     $testFunctionName
-    ScriptInform "Test: '$testFunctionName' Funcion: '$funcToExecute' Desc: `${TEST_NAME_SPACE}Desc`"       
-     if ! ${TEST_NAME_SPACE}$funcToExecute "${@:2}"; then
-      ScriptUnwind $LINENO "Unexpected failure detected."
+    ScriptInform "Test: '$testFunctionName' Function: '$funcToExecute'."
+     if ! ${TEST_NAME_SPACE}$funcToExecute "${@:3}"; then
+       ScriptError "Test: '$testFunctionName' Function: '$funcToExecute' Failed.'"
+       if [ "$notifyWhen" == "ImmediateNotify" ]; then exit 1; fi
+       if [ "$notifyWhen" == "AtEndNotify" ]; then
+         errorInd='true'
+         continue
+       fi
+       ScriptUnwind "$LINENO" "On error notify directive not supported: '$notifyWhen'."
     fi
-    ScriptInform "Test: '$testFunctionName' Funcion: '$funcToExecute' Successful.'"       
+    ScriptInform "Test: '$testFunctionName' Function: '$funcToExecute' Successful.'"
   done
+  if $errorInd; then false; fi
 }
 ###############################################################################
 ##
@@ -373,11 +385,9 @@ function TestExecuteAssert () {
       ScriptInform "Test: '$testFunctionName' Desc: `${TEST_NAME_SPACE}Desc`"
       if $remnantScan; then
         ScriptInform "Test: '$testFunctionName' Function: 'EnvCheck'."
-        local remnantDetected='false'
-        if ! ${TEST_NAME_SPACE}EnvCheck 'remnantDetected'; then ScriptUnwind $LINENO "Unexpected failure detected. Function 'EnvCheck'."; fi
-        if $remnantDetected; then 
-          ScriptUnwind $LINENO "Previous test left overlapping remnant or another process created it."
-        fi
+        if ! "${TEST_NAME_SPACE}EnvCheck"; then
+          ScriptUnwind "$LINENO" 'One or more remnants were detected between running tests.'
+        fi 
       fi
       ScriptInform "Test: '$testFunctionName' Function: 'Run'."
       if ! ${TEST_NAME_SPACE}Run; then ScriptUnwind $LINENO "Unexpected failure detected. Function 'Run'."; fi
@@ -408,7 +418,7 @@ TestSelect(){
   local -i testNumStartPos=${#TEST_NAME_SPACE}+1
   TestSelectRegexApply(){
     while [ "$#" -gt '0' ]; do
-      local -r regExpress="$1"
+      local regExpress="$1"
       TestSelectSpecificationApply "$regExpress"
       shift
     done
