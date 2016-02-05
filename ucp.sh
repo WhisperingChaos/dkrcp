@@ -153,6 +153,14 @@ VirtCmmdExecute(){
   local -A argTargetObj
   target_obj_Create "$optArgMap_ref" "$argTarget" 'argTargetObj'
   local -r argTargetObj
+  if (( ${#argSourceList[@]} > 1 )); then
+    # linux cp -a requires the target refer to a directory when copying from multiple sources.
+    if ! target_obj_arg_PermitsMultiSource 'argTargetObj'; then
+      ScriptError "Multiple sources require target to be an existing directory."
+      return
+      #TODO: call to destroy arguments
+    fi
+  fi
   # perform the copy operation for each source
   local ix_src
   for (( ix_src=0; ix_src < ${#argSourceList[@]}; ix_src++ ))
@@ -175,6 +183,7 @@ VirtCmmdExecute(){
       ScriptError "Copy failure source type: '$argSourceType', source: '$argPathSource', target type: '$argTargetType', target: '$argPathTarget'."
       target_obj_Destroy 'argTargetObj'
       source_obj_Destroy 'argSourceObj'
+      #TODO: call to destroy arguments
       return
     source_obj_Destroy 'argSourceObj'
     fi
@@ -456,6 +465,24 @@ target_type_interface(){
   target_obj_docker_arg_Get(){
     AssociativeMapAssignIndirect "$1" 'objRef' "$2"
   }
+  
+  ##############################################################################
+  ##
+  ##  Purpose:
+  ##    Does the target argument refer to an existing directory?.
+  ##
+  ##  Inputs:
+  ##    $1 - This pointer - associative map variable name of the type that 
+  ##         supports this interface.
+  ##    $2 - A variable name that will be assigned the docker cp argument value.
+  ##
+  ##  Outputs:
+  ##    $2 - Updated to reflect the docker cp argument value.
+  ##
+  ###############################################################################
+  target_obj_arg_PermitsMultiSource(){
+    ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
+  }
   ##############################################################################
   ##
   ##  Purpose:
@@ -513,6 +540,9 @@ target_type_simple(){
   target_obj_type_Get(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
   }
+  target_obj_arg_PermitsMultiSource(){
+    false
+  }
   target_obj_Commit(){
     true
   }
@@ -559,6 +589,13 @@ target_type_filepath(){
   target_obj_type_Get(){
     eval $1\=\'\filepath\'
   }
+  target_obj_arg_PermitsMultiSource(){
+    local -r this_ref="$1"
+    local hostFilePath
+    target_obj_docker_arg_Get "$this_ref" 'hostFilePath'
+    local -r hostFilePath
+    [ -d "$hostFilePath" ]
+  }
 }
 ##############################################################################
 ##
@@ -581,6 +618,13 @@ target_type_containerfilepath(){
   }
   target_obj_type_Get(){
     eval $1\=\'\containerfilepath\'
+  }
+  target_obj_arg_PermitsMultiSource(){
+    local -r this_ref="$1"
+    local containerFilePath
+    target_obj_docker_arg_Get "$this_ref" 'containerFilePath'
+    local -r containerFilePath
+    container_filepath_IsDir "$containerFilePath"
   }
 }
 ##############################################################################
@@ -682,6 +726,13 @@ target_type_imagefilepath(){
     eval local \-r entryPtCurrent\=\"\$\{$targetObj_ref\[entryPtCurrent\]\}\"
     eval local \-r imageName\=\"\$\{$targetObj_ref\[imageName\]\}\"
     eval docker commit $entryptNullify \$targetContainer \$imageName
+  }
+  target_obj_arg_PermitsMultiSource(){
+    local -r this_ref="$1"
+    local containerFilePath
+    target_obj_docker_arg_Get "$this_ref" 'containerFilePath'
+    local -r containerFilePath
+    container_filepath_IsDir "$containerFilePath"
   }
   target_obj_Destroy(){
     local -r targetObj_ref="$1"
@@ -901,6 +952,36 @@ arg_type_format_decide() {
   eval $typeName_ref\=\$typeName
   return 0
 }
+##############################################################################
+##
+##  Purpose:
+##    Determine if a container path refers to a directory.
+##
+##  Inputs:
+##    $1 - Docker container path format accepted by docker cp command.
+##
+##  Outputs:
+##    When success:
+##       Container path refers to an existing directory
+##
+###############################################################################
+container_filepath_IsDir(){
+  local containerFilePath="$1"
+  [[ $containerFilePath =~ $REG_EX_CONTAINER_NAME_UUID(:.*) ]]
+  if (( ${#BASH_REMATCH[1]} < 3 )); then
+    # optimization when referring to root directory
+    if [ "${containerFilePath:(-1)}" == ':' ] ||  [ "${containerFilePath:(-1)}" == '/' ]; then
+      true
+      return
+    fi
+  fi
+  if [ "${containerFilePath:(-2)}" != '/,' ]; then
+    containerFilePath+='/.'
+  fi
+  local -r containerFilePath
+  docker cp "$containerFilePath" - >/dev/null 2>/dev/null
+}
+
 ##############################################################################
 ##
 ##  Purpose:
