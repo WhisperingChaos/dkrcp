@@ -527,19 +527,7 @@ dkrcp_arg_interface(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
   }
 }
-###########################################################################
-##
-##  Purpose:
-##    Implement interface for dkrcp arguments bound to host file path.
-##
-##  Members:
-##   'ArgFilePath'      - The host source/destination file path for
-##                        dkrcp command.
-##   'ResourceFilePath' - A file path to the resource representing
-##                        the host file path.
-###########################################################################
-dkrcp_arg_hostfilepath_hostfilepathExist_impl(){
-  dkrcp_arg_interface
+hostfilepathname_dependent_impl(){
   ###########################################################################
   ##
   ##  Purpose:
@@ -559,11 +547,15 @@ dkrcp_arg_hostfilepath_hostfilepathExist_impl(){
   ##
   ###########################################################################
   _Create(){
-    local -r this_ref="$1"
-    local -r argFileType="$2"
-    local -r argFilePath="$3"
-    local -r funcNameContentGen="$4"
-    _reflect_type_Set "$this_ref" 'dkrcp_arg_hostfilepath_hostfilepathExist_impl'
+    hostfilepathname_Create 'hostfilepathname_dependent_impl' "$@"
+  }
+  hostfilepathname_Create(){
+    local -r thisTypeName="$1"
+    local -r this_ref="$2"
+    local -r argFileType="$3"
+    local -r argFilePath="$4"
+    local -r funcNameContentGen="$5"
+    _reflect_type_Set "$this_ref" "$thisTypeName"
     local resourceFilePath
     resource_File_Path_Name_Prefix "$argFilePath" 'resourceFilePath'
     _reflect_field_Set "$this_ref"                \
@@ -572,11 +564,7 @@ dkrcp_arg_hostfilepath_hostfilepathExist_impl(){
       'ResourceFilePath'   "$resourceFilePath"    \
       'FuncNameContentGen' "$funcNameContentGen"
   }
-  dkrcp_arg_Get(){
-    local -r this_ref="$1"
-    _reflect_field_Get "$this_ref" 'ResourceFilePath' "$2"
-  }
-  dkrcp_arg_resource_Bind(){
+  hostfilepathname_dependent_Bind(){
     local -r this_ref="$1"
     local resourceFilePath
     local funcNameContentGen
@@ -586,6 +574,53 @@ dkrcp_arg_hostfilepath_hostfilepathExist_impl(){
     local -r resourceFilePath
     local -r funcNameContentGen
     $funcNameContentGen "$resourceFilePath"
+  }
+  hostfilepathname_dependent_Delete(){
+    local -r this_ref="$1"
+    local resourceFilePath
+    _reflect_field_Get "$this_ref" 'ResourceFilePath' 'resourceFilePath'
+    local -r resourceFilePath
+    file_path_safe_Remove "$resourceFilePath" >/dev/null
+  }
+  hostfilepathname_dependent_Check(){
+    local -r this_ref="$1"
+    local resourceFilePath
+    _reflect_field_Get "$this_ref" 'ResourceFilePath' 'resourceFilePath'
+    local -r resourceFilePath
+    file_path_safe_Remove "$resourceFilePath" >/dev/null
+  }
+  env_clean_interface
+  env_Clean(){
+    hostfilepathname_dependent_Delete "$1"
+  }
+  env_check_interface
+  env_Check(){
+    hostfilepathname_dependent_Check "$1"
+  }
+}
+###########################################################################
+##
+##  Purpose:
+##    Implement interface for dkrcp arguments bound to host file path.
+##
+##  Members:
+##   'ArgFilePath'      - The host source/destination file path for
+##                        dkrcp command.
+##   'ResourceFilePath' - A file path to the resource representing
+##                        the host file path.
+###########################################################################
+dkrcp_arg_hostfilepath_hostfilepathExist_impl(){
+  dkrcp_arg_interface
+  hostfilepathname_dependent_impl
+  _Create(){
+    hostfilepathname_Create 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' "$@"
+  }
+  dkrcp_arg_Get(){
+    local -r this_ref="$1"
+    _reflect_field_Get "$this_ref" 'ResourceFilePath' "$2"
+  }
+  dkrcp_arg_resource_Bind(){
+    hostfilepathname_dependent_Bind "$1"
   }
   dkrcp_arg_model_settings_Get(){
     local -r this_ref="$1"
@@ -618,13 +653,7 @@ dkrcp_arg_hostfilepath_hostfilepathExist_impl(){
   }
   env_check_interface
   env_Check(){
-    local -r this_ref="$1"
-    local resourceFilePath
-    _reflect_field_Get "$this_ref" 'ResourceFilePath' 'resourceFilePath'
-    local -r resourceFilePath
-    if [ -e "$resourceFilePath" ]; then
-      ScriptDetectNotify "host file: '$resourceFilePath', involved in testing."
-    fi
+    hostfilepathname_dependent_Check "$1"
   }
 }
 dkrcp_arg_hostfilepath_hostfilepathNotExist_impl(){
@@ -990,70 +1019,6 @@ dkrcp_arg_container_exist_impl(){
   env_Check(){
     # derived from an image constructed by the same test.
     true
-  }
-}
-hostfilepathname_dependent_impl(){
-#TODO: DRY : same constructor, bind, and delete code.
-  ###########################################################################
-  ##
-  ##  Purpose:
-  ##    Factory function to construct a host file argument that refers to
-  ##    a host file resource.
-  ##
-  ##  Inputs:
-  ##    $1 - An 'empty' associative map variable.
-  ##    $2 - The type of host file path:
-  ##         'f' - file path resolves to a file.
-  ##         'd' - file path resolves to a directory.
-  ##    $3 - dkrcp host file path.
-  ##    $4 - A function name that generates $3's content.
-  ##
-  ##  Outputs:
-  ##    $1 - A constructed this pointer.
-  ##
-  ###########################################################################
-  _Create(){
-    local -r this_ref="$1"
-    local -r argFileType="$2"
-    local -r argFilePath="$3"
-    local -r funcNameContentGen="$4"
-    _reflect_type_Set "$this_ref" 'hostfilepathname_dependent_impl'
-    local resourceFilePath
-    resource_File_Path_Name_Prefix "$argFilePath" 'resourceFilePath'
-    _reflect_field_Set "$this_ref"                \
-      'ArgFileType'        "$argFileType"         \
-      'ArgFilePath'        "$argFilePath"         \
-      'ResourceFilePath'   "$resourceFilePath"    \
-      'FuncNameContentGen' "$funcNameContentGen"
-  }
-  hostfilepathname_dependent_Bind(){
-    local -r this_ref="$1"
-    local resourceFilePath
-    local funcNameContentGen
-    _reflect_field_Get "$this_ref"               \
-      'ResourceFilePath'   'resourceFilePath'    \
-      'FuncNameContentGen' 'funcNameContentGen'
-    local -r resourceFilePath
-    local -r funcNameContentGen
-    $funcNameContentGen "$resourceFilePath"
-  }
-  env_clean_interface
-  env_Clean(){
-    local -r this_ref="$1"
-    local resourceFilePath
-    _reflect_field_Get "$this_ref" 'ResourceFilePath' 'resourceFilePath'
-    local -r resourceFilePath
-    file_path_safe_Remove "$resourceFilePath" >/dev/null
-  }
-  env_check_interface
-  env_Check(){
-    local -r this_ref="$1"
-    local resourceFilePath
-    _reflect_field_Get "$this_ref" 'ResourceFilePath' 'resourceFilePath'
-    local -r resourceFilePath
-    if [ -e "$resourceFilePath" ]; then
-      ScriptDetectNotify "host file: '$resourceFilePath', involved in testing."
-    fi
   }
 }
 
