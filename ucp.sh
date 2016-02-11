@@ -2,10 +2,14 @@ source "MessageInclude.sh";
 source "ArgumentsGetInclude.sh";
 source "ArrayMapTestInclude.sh";
 source "VirtCmmdInterface.sh";
+ref_simple_value_Set(){
+  eval $1=\"\$2\"
+}
 #TODO: Add Digest support.
 #TODO: remove ScriptDebug messages.
 #TODO: Support docker -c option to permit specifying commands
 #TODO: support import as a mechanism --upc-import
+#TODO: convert to more standard oo implementation
 ##############################################################################
 ##
 ##  Purpose:
@@ -66,7 +70,7 @@ cat <<VERSION_DOC
 Version : 0.5
 Requires: bash 4.2+, Docker Client 1.8+
 Issues  : 
-License : The MIT License (MIT) Copyright (c) 2014-2015 Richard Moyse License@Moyse.US
+License : The MIT License (MIT) Copyright (c) 2014-2016 Richard Moyse License@Moyse.US
 
 VERSION_DOC
 }
@@ -136,31 +140,23 @@ VirtCmmdExecute(){
   # by the type of target object.
   target_type_${argTargetType}
   # verify compatibility between source & target types.
-  local ix_src
-  local typeCompatFail='false'
-  for (( ix_src=0; ix_src < ${#argSourceList[@]}; ix_src++ ))
-  do
-    local argSourceType
-    arg_type_format_decide "${argSourceList[$ix_src]}" 'argSourceType'
-    if ! target_compatibility_Check "$argSourceType"; then
-      ScriptError "Source type: '$argSourceType', source: '${argSourceList[$ix_src]}', incompatible with target type: '$argTargetType'."
-      typeCompatFail='true'
-    fi
-  done
-  # if problem with compatibility break out
-  if $typeCompatFail; then return 1; fi
+  if ! arg_type_compatibility_Check 'argSourceList' 'argTargetType'; then return 1; fi
   # create target object
   local -A argTargetObj
   target_obj_Create "$optArgMap_ref" "$argTarget" 'argTargetObj'
   local -r argTargetObj
   if (( ${#argSourceList[@]} > 1 )); then
     # linux cp -a requires the target refer to a directory when copying from multiple sources.
-    if ! target_obj_arg_PermitsMultiSource 'argTargetObj'; then
-      ScriptError "Multiple sources require target to be an existing directory."
+    local errorMessage
+    if ! target_obj_arg_PermitsMultiSource 'argTargetObj' 'errorMessage'; then
+      target_obj_Rollback 'argTargetObj'
+      ScriptError "$errorMessage"
       return
-      #TODO: call to destroy arguments
     fi
   fi
+  local targetReference
+  target_obj_docker_arg_Get 'argTargetObj' 'targetReference'
+  local -r targetReference
   # perform the copy operation for each source
   local ix_src
   for (( ix_src=0; ix_src < ${#argSourceList[@]}; ix_src++ ))
@@ -172,25 +168,23 @@ VirtCmmdExecute(){
     source_type_${argSourceType}
     local -A argSourceObj=()
     source_obj_Create "$optArgMap_ref" "${argSourceList[$ix_src]}" 'argSourceObj'
+    local sourceReference
+    source_obj_docker_arg_Get 'argSourceObj' 'sourceReference'
+    local -r sourceReference
     # execute in a sub-shell in order to cleanup from copy exceptions  
-    if ! $( cp_strategy_Exec 'argSourceObj' 'argTargetObj' ); then
-      local argSourceType
-      source_obj_type_Get 'argSourceObj' 'argSourceType'
-      local argPathSource
-      source_obj_docker_arg_Get 'argSourceObj' 'argPathSource'
-      local argPathTarget
-      target_obj_docker_arg_Get 'argTargetObj' 'argPathTarget'
-      ScriptError "Copy failure source type: '$argSourceType', source: '$argPathSource', target type: '$argTargetType', target: '$argPathTarget'."
-      target_obj_Destroy 'argTargetObj'
-      source_obj_Destroy 'argSourceObj'
-      #TODO: call to destroy arguments
+    if ! $( cp_strategy_Exec "$argSourceType" "$sourceReference" "$argTargetType" "$targetReference" ); then
+      #TODO: remove
+      #cp_strategy_failure_Mess 'argSourceObj' 'argTargetObj'
+      source_obj_Release 'argSourceObj'
+      target_obj_Rollback 'argTargetObj'
+      false
       return
-    source_obj_Destroy 'argSourceObj'
     fi
+    source_obj_Release 'argSourceObj'
   done
   # successfully completed copy operation commit changes to target.
-  target_obj_Commit 'argTargetObj'
-  target_obj_Destroy 'argTargetObj'
+  target_obj_Commit  'argTargetObj'
+  target_obj_Release 'argTargetObj'
 }
 ##############################################################################
 ##
@@ -298,6 +292,38 @@ arg_source_target(){
 ##############################################################################
 ##
 ##  Purpose:
+##    Determine if source type can be copied to the desired target type.
+##
+##  Inputs:
+##    $1 - Source arguments entered by the command line.
+##    $2 - Target argument type determined by the target argument entered
+##         on the command line.
+##
+##  Outputs:
+##    When successful: Nothing - all source arguments are compatible with target.
+##    Otherwise:       Message to STDERR
+##
+###############################################################################
+arg_type_compatibility_Check(){
+  local argSourceList_ref="$1"
+  local argTargetType="$2"
+  local typeCompatSuccess='true'
+  local ix_src
+  for (( ix_src=0; ix_src < ${#argSourceList[@]}; ix_src++ ))
+  do
+    local argSourceType
+    eval local argSourceElem\=\"\$\{$argSourceList_ref\[\$ix_src\]\}\"
+    arg_type_format_decide "$argSourceElem" 'argSourceType'
+    if ! target_compatibility_Check "$argSourceType"; then
+      ScriptError "Source type: '$argSourceType', source: '$argSourceElem', incompatible with target type: '$argTargetType'."
+      typeCompatSuccess='false'
+    fi
+  done
+  $typeCompatSuccess
+}
+##############################################################################
+##
+##  Purpose:
 ##    Define a unified interface for source types.  Any defined source type must
 ##    inherit and implement this interface.
 ##
@@ -362,14 +388,14 @@ source_type_interface(){
   ##############################################################################
   ##
   ##  Purpose:
-  ##    Release any resources held by the source object/argument type.
+  ##    Liberate any resources held by the source object/argument type.
   ##
   ##  Inputs:
   ##    $1 - The name of a variable representing the associative map constructed
   ##         by the source_obj_Create method.
   ##
   ###############################################################################
-  source_obj_Destroy(){
+  source_obj_Release(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
   }
 }
@@ -394,7 +420,7 @@ source_type_simple(){
   source_obj_type_Get(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
   }
-  source_obj_Destroy(){
+  source_obj_Release(){
     true
   }
 }
@@ -465,19 +491,20 @@ target_type_interface(){
   target_obj_docker_arg_Get(){
     AssociativeMapAssignIndirect "$1" 'objRef' "$2"
   }
-  
   ##############################################################################
   ##
   ##  Purpose:
-  ##    Does the target argument refer to an existing directory?.
+  ##    Does the target argument accept data from multiple sources.
   ##
   ##  Inputs:
   ##    $1 - This pointer - associative map variable name of the type that 
   ##         supports this interface.
-  ##    $2 - A variable name that will be assigned the docker cp argument value.
+  ##    $2 - A variable name that accepts a message explaining a detected
+  ##         incompatibility.
   ##
   ##  Outputs:
-  ##    $2 - Updated to reflect the docker cp argument value.
+  ##    When success: Nothing.
+  ##    Otherwise: $2 - Updated with incompatibility reason.
   ##
   ###############################################################################
   target_obj_arg_PermitsMultiSource(){
@@ -500,14 +527,28 @@ target_type_interface(){
   ##############################################################################
   ##
   ##  Purpose:
-  ##    Release any resources held by the target object/argument type.
+  ##    Liberate any resources held by the target object/argument type.
   ##
   ##  Inputs:
   ##    $1 - The name of a variable representing the associative map constructed
   ##         by the target_obj_Create method.
   ##
   ###############################################################################
-  target_obj_Destroy(){
+  target_obj_Release(){
+    ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
+  }
+  ##############################################################################
+  ##
+  ##  Purpose:
+  ##    When possible, revert to prior state.  Assumes error occurred befor
+  ##    target_obj_Commit executed.
+  ##
+  ##  Inputs:
+  ##    $1 - The name of a variable representing the associative map constructed
+  ##         by the target_obj_Create method.
+  ##
+  ###############################################################################
+  target_obj_Rollback(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
   }
 }
@@ -541,12 +582,16 @@ target_type_simple(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
   }
   target_obj_arg_PermitsMultiSource(){
+    ref_simple_value_Set "$errorMess_ref" "Target does not support more than one source."
     false
   }
   target_obj_Commit(){
     true
   }
-  target_obj_Destroy(){
+  target_obj_Release(){
+    true
+  }
+  target_obj_Rollback(){
     true
   }
 }
@@ -591,10 +636,14 @@ target_type_filepath(){
   }
   target_obj_arg_PermitsMultiSource(){
     local -r this_ref="$1"
+    local -r errorMess_ref="$2"
     local hostFilePath
     target_obj_docker_arg_Get "$this_ref" 'hostFilePath'
     local -r hostFilePath
-    [ -d "$hostFilePath" ]
+    if ! [ -d "$hostFilePath" ]; then
+      ref_simple_value_Set "$errorMess_ref" "Multiple sources require target to be an existing directory."
+      false
+    fi
   }
 }
 ##############################################################################
@@ -621,10 +670,14 @@ target_type_containerfilepath(){
   }
   target_obj_arg_PermitsMultiSource(){
     local -r this_ref="$1"
+    local -r errorMess_ref="$2"
     local containerFilePath
     target_obj_docker_arg_Get "$this_ref" 'containerFilePath'
     local -r containerFilePath
-    container_filepath_IsDir "$containerFilePath"
+    if ! container_filepath_IsDir "$containerFilePath"; then
+      ref_simple_value_Set "$errorMess_ref" "Multiple sources require target to be an existing directory."
+      false
+    fi
   }
 }
 ##############################################################################
@@ -674,7 +727,7 @@ source_type_imagefilepath(){
   source_obj_type_Get(){
     eval $1\=\'\imagefilepath\'
   }
-  source_obj_Destroy(){
+  source_obj_Release(){
     local -r sourceObj_ref="$1"
     eval local \-r sourceContainer\=\"\$\{$sourceObj_ref\[sourceContainer\]\}\"
     docker rm $sourceContainer>/dev/null
@@ -693,6 +746,7 @@ target_type_imagefilepath(){
     # search for target image
     local nameResolveReg
     AssociativeMapAssignIndirect "$optArgMap_ref" '--ucpchk-reg' 'nameResolveReg'
+    eval $targetObj_ref\[ImageIsNew\]\=\"\false\"
     local imageNameUUID
     local imageFilePath
     image_nameUUID_filepath_Extract "$argTarget" 'imageNameUUID' 'imageFilePath'
@@ -700,6 +754,7 @@ target_type_imagefilepath(){
     if ! image_normalized_label_instance_Exists "$imageNameUUID" "$nameResolveReg" 'imageNameUUID' 'imageNmRepoIs'; then
       # target image doesn't exist create new image.
       image_Create "$imageNameUUID"
+      eval $targetObj_ref\[ImageIsNew\]\=\"\true\"
     fi
     # convert image into container.
     local targetContainer
@@ -729,16 +784,29 @@ target_type_imagefilepath(){
   }
   target_obj_arg_PermitsMultiSource(){
     local -r this_ref="$1"
+    local -r errorMess_ref="$2"
     local containerFilePath
     target_obj_docker_arg_Get "$this_ref" 'containerFilePath'
     local -r containerFilePath
-    container_filepath_IsDir "$containerFilePath"
+    if container_filepath_IsDir "$containerFilePath"; then
+      ref_simple_value_Set "$errorMess_ref" "Multiple sources require target to be an existing directory."
+      false
+    fi
   }
-  target_obj_Destroy(){
+  target_obj_Release(){
     local -r targetObj_ref="$1"
     eval local \-r targetContainer\=\"\$\{$targetObj_ref\[targetContainer\]\}\"
     # remove the container from which the image was committed.
     docker rm $targetContainer>/dev/null
+  }
+  target_obj_Rollback(){
+    local -r targetObj_ref="$1"
+    target_obj_Release "$targetObj_ref"
+    eval local \-r imageIsNew\=\"\$\{$targetObj_ref\[ImageIsNew\]\}\"
+    if $imageIsNew; then 
+      eval local \-r imageName\=\"\$\{$targetObj_ref\[imageName\]\}\"
+      docker rmi $imageName >/dev/null
+    fi
   }
 }
 ##############################################################################
@@ -770,22 +838,18 @@ type_valid_AllIs(){
 ##    types.  
 ##
 ##  Inputs:
-##    $1 - Source object map providing following interface:
-##         'objType' - provides the source's type.
-##    $2 - Target object map providing following interface:
-##         'objType' - provides the target's type.
+##    $1 - Type of source argument.
+##    $2 - Source argument format accepted by docker cp
+##    $3 - Type of target argument.
+##    $4 - Target argument format accepted by docker cp
 ##
 ###############################################################################
 cp_strategy_Exec(){
-  local -r argSourceObj_ref="$1"
-  local -r argTargetObj_ref="$2"
+  local -r sourceType="$1"
+  local -r sourceArgDockercp="$2"
+  local -r targetType="$3"
+  local -r targetArgDockercp="$4"
 
-  local sourceType
-  AssociativeMapAssignIndirect "$argSourceObj_ref" 'objType' 'sourceType'
-  local -r sourceType
-  local targetType
-  AssociativeMapAssignIndirect "$argTargetObj_ref" 'objType' 'targetType'
-  local -r targetType
   # generally apply the 'simple' copy strategy
   local copyStrategy='cp_simple'
   if  ( [ "$sourceType" == 'containerfilepath' ] \
@@ -798,7 +862,7 @@ cp_strategy_Exec(){
     local copyStrategy='cp_complex'
   fi
   local -r copyStrategy     
-  $copyStrategy "$argSourceObj_ref" "$argTargetObj_ref"
+  $copyStrategy "$sourceArgDockercp" "$targetArgDockercp"
 }
 ##############################################################################
 ##
@@ -807,10 +871,8 @@ cp_strategy_Exec(){
 ##    the target one.
 ##
 ##  Inputs:
-##    $1 - Source object map providing following interface:
-##         'objRef' - provides a file path type understood by docker cp.
-##    $2 - Target object map providing following interface:
-##         'objRef' - provides a file path type understood by docker cp.
+##    $1 - Source argument format accepted by docker cp
+##    $2 - Target argument format accepted by docker cp
 ##
 ##  Outputs:
 ##    When successful:
@@ -820,17 +882,10 @@ cp_strategy_Exec(){
 ##
 ###############################################################################
 cp_simple(){
-  local -r argSourceObj_ref="$1"
-  local -r argTargetObj_ref="$2"
+  local -r sourceArgDocker="$1"
+  local -r targetArgDocker="$2"
 
-  local sourceReference
-  source_obj_docker_arg_Get "$argSourceObj_ref" 'sourceReference'
-  local -r sourceReference
-  local targetReference
-  target_obj_docker_arg_Get "$argTargetObj_ref" 'targetReference'
-  local -r targetReference
-
-  eval docker cp \"\$sourceReference\" \"\$targetReference\" \>\/dev\/null
+  eval docker cp \"\$sourceArgDocker\" \"\$targetArgDocker\" \>\/dev\/null
 }
 ##############################################################################
 ##
@@ -856,40 +911,33 @@ cp_simple(){
 ##
 ###############################################################################
 cp_complex(){
-  local -r argSourceObj_ref="$1"
-  local -r argTargetObj_ref="$2"
-
-  local sourceReference
-  source_obj_docker_arg_Get "$argSourceObj_ref" 'sourceReference'
-  local -r sourceReference
-  local targetReference
-  target_obj_docker_arg_Get "$argTargetObj_ref" 'targetReference'
-  local -r targetReference
+  local -r sourceArgDocker="$1"
+  local -r targetArgDocker="$2"
 
   docker_stream_Copy(){
-    local sourceReference="$1"
-    local targetReference="$2"
+    local -r sourceArgDocker="$1"
+    local -r targetArgDocker="$2"
     set -o pipefail
     # redirect first set of errors to null device. This prevents displaying 'write /dev/stdout: broken pipe' message
     # when target isn't valid.  It also silences other messages concerning the source.  However, since there's
     # only one error message that can be recovered from and it is issued by the second docker cp command,
     # these other messages can be safely ignored as the return code will reflect any failure in the pipleline.
     # not meant to be used outside its enclosing function.
-    docker cp "$sourceReference" - 2>/dev/null | docker cp - "$targetReference"
+    docker cp "$sourceArgDocker" - 2>/dev/null | docker cp - "$targetArgDocker"
   }
-  if dockedMsg="$(docker_stream_Copy "$sourceReference" "$targetReference" 2>&1 )"; then
+  if dockedMsg="$(docker_stream_Copy "$sourceArgDocker" "$targetArgDocker" 2>&1 )"; then
     return
   fi
   if ! [[ $dockedMsg =~ ^destination.+must.be.a.directory ]]; then
     echo "$dockedMsg">&2
-    ScriptUnwind "$LINENO" "Unexpected failure detected during streamed,piped docker cp from: '$sourceReference', to: '$targetReference'."
+    ScriptUnwind "$LINENO" "Unexpected failure detected during streamed,piped docker cp from: '$sourceArgDocker', to: '$targetArgDocker'."
   fi
   # unable to stream, convert into two simpler docker cp commands.
   # doing so requires temporarily copying the source then deleting
   # the copy.
-  local    tmpHostRefTarget="$HOST_FILE_ROOT/$$/$sourceReference"
+  local    tmpHostRefTarget="$HOST_FILE_ROOT/$$/$sourceArgDocker"
   local -r tmpHostRefSource="$tmpHostRefTarget"
-  if [ "${sourceReference:${#sourceReference}-2}" == '/.' ]; then
+  if [ "${sourceArgDocker:${#sourceArgDocker}-2}" == '/.' ]; then
     tmpHostRefTarget="${tmpHostRefTarget:0:-2}"
   fi
   local -r tmpHostRefTarget
@@ -897,16 +945,29 @@ cp_complex(){
   if ! mkdir -p "$( dirname "$tmpHostRefTarget" )">/dev/null; then
     ScriptUnwind "$LINENO" "rm failed for: '$tmpHostRefTarget'."
   fi
-  if ! docker cp "$sourceReference" "$tmpHostRefTarget">/dev/null; then
-    ScriptUnwind "$LINENO" "docker cp '$sourceReference', '$tmpHostRefTarget'."
+  if ! docker cp "$sourceArgDocker" "$tmpHostRefTarget">/dev/null; then
+    ScriptUnwind "$LINENO" "docker cp '$sourceArgDocker', '$tmpHostRefTarget'."
   fi
-  if ! docker cp "$tmpHostRefSource" "$targetReference">/dev/null; then
-    ScriptUnwind "$LINENO" "docker cp '$tmpHostRefSource', '$targetReference'."
+  if ! docker cp "$tmpHostRefSource" "$targetArgDocker">/dev/null; then
+    ScriptUnwind "$LINENO" "docker cp '$tmpHostRefSource', '$targetArgDocker'."
   fi
   if ! rm -rf "$tmpHostRefTarget">/dev/null; then
     ScriptUnwind "$LINENO" "rm failed for: '$tmpHostRefTarget'."
   fi
 }
+#TODO: if not necessary, remove
+#cp_strategy_failure_Mess(){
+  #  local -r argSourceObj_ref="$1"
+  #  local -r argTargetObj_ref="$2"
+  #  local argSourceType
+  #  source_obj_type_Get 'argSourceType'
+  #local argPathSource
+  #source_obj_docker_arg_Get "$argSourceObj_ref" 'argPathSource'
+  #local argPathTarget
+  #target_obj_docker_arg_Get "$argTargetObj_ref" 'argPathTarget'
+  #ScriptError "Copy failure source type: '$argSourceType', source: '$argPathSource', target type: '$argTargetType', target: '$argPathTarget'."
+#}
+
 ##############################################################################
 ##
 ##  Purpose:
