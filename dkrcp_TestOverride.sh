@@ -69,168 +69,6 @@ env_clean_interface(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
   }
 }
-
-###########################################################################
-##
-##  Purpose:
-##    Defines concrete introspection methods for all objects.
-##
-###########################################################################
-reflect_impl(){
-  ###########################################################################
-  ##
-  ##  Purpose:
-  ##    Object types encode their specific concrete implementation of 
-  ##    an abstract interface via a set of bash functions whose names
-  ##    mirror the ones defined by the given abstract interface.  These
-  ##    concrete functions are encapsulated (defined) within a function whose
-  ##    name matches the concrete type (a.k.a object's type name).  To ensure
-  ##    the proper execution of a given object's concrete methods, this
-  ##    encapsulating function should/must be executed before invoking any of
-  ##    the object's methods, as it will define new/override existing function
-  ##    definitions potentially implemented by other object types which
-  ##    implement the same abstract interface.
-  ##
-  ##  Inputs:
-  ##    $1 - The this pointer - reference to an associative map variable.
-  ##
-  ##  When successful:
-  ##    bash maintained function definition table reflects the concrete 
-  ##    implementation of one or more abstract interfaces.
-  ##
-  ###########################################################################
-  reflect_type_Active(){
-    local typeNameConcrete
-    reflect_type_Get "$1" 'typeNameConcrete'
-    local -r typeNameConcrete
-    if ! $typeNameConcrete; then
-      ScriptUnwind "$LINENO" "Unknown concrete type name: '$typeNameConcrete'."
-    fi
-  }
-  ###########################################################################
-  ##
-  ##  Purpose:
-  ##    Optimizes function overriding by comparing the given object's
-  ##    concrete interface implementation with a value that reflects the
-  ##    most recently defined/invoked concrete interface to determine
-  ##    if it's necessary to update bash's function definition table.
-  ##
-  ##  Inputs:
-  ##    $1 - An object's this pointer.
-  ##    $2 - A variable name whose value reflects the most recently
-  ##         invoked concrete object type
-  ##
-  ##  When successful:
-  ##    bash maintained function definition table reflects the concrete 
-  ##    implementation of one or more abstract interfaces.
-  ##    $2 - The variable value reflects the most recent concrete interface
-  ##         name.
-  ##
-  ###########################################################################
-  reflect_type_ActiveOptimize(){
-    local -r typeNameCurrVarName_ref="$2"
-    eval local \-r typeNameCurrValue_lcl\=\"\$$typeNameCurrVarName_ref\"
-    local _typeNameConcrete
-    reflect_type_Get "$1" '_typeNameConcrete'
-    local -r _typeNameConcrete
-    if [ "${_typeNameConcrete}" == "$typeNameCurrValue_lcl" ]; then return; fi
-    if ! ${_typeNameConcrete} 2>/dev/null; then
-      ScriptUnwind "$LINENO" "Unknown concrete type name: '${_typeNameConcrete}'."
-    fi
-    ref_simple_value_Set "$typeNameCurrVarName_ref" "${_typeNameConcrete}"
-  }
-  ###########################################################################
-  ##
-  ##  Purpose:
-  ##    Return an object's concrete type name.  This name is the same one
-  ##    assigned to a bash function that encapsulates an object's
-  ##    implemented interface(s).
-  ##
-  ##    Why would this be public?  
-  ##      > Permits access by type converters and optimizers.
-  ##
-  ##  Inputs:
-  ##    $1 - The this pointer - reference to an associative map variable.
-  ##    $2 - Variable name that accepts the type name value.
-  ##
-  ##  Outputs:
-  ##    $2 - Value of this variable is assigned this object's concrete type name.
-  ##
-  ###########################################################################
-  reflect_type_Get(){
-    _reflect_field_Get $1 'TypeName' "$2"
-  }
-  ###########################################################################
-  ##
-  ##  Purpose:
-  ##    A private function used by object constructor to remember the object's
-  ##    concrete interface name.
-  ##
-  ##  Inputs:
-  ##    $1 - An object's this pointer.
-  ##    $2 - The object's concrete type.
-  ##
-  ##  Outputs:
-  ##    $1 - 'TypeName' field reflect's object's concrete type.
-  ##
-  ###########################################################################
-  _reflect_type_Set(){
-    _reflect_field_Set $1 'TypeName' "$2"
-  }
-  ###########################################################################
-  ##
-  ##  Purpose:
-  ##    Facilitate assignment to an object's properties.
-  ##
-  ##  Inputs:
-  ##    $1 - The this pointer - reference to an associative map variable.
-  ##    $2 - Object field name
-  ##    $3   Object field value
-  ##    $n+1 - see $2
-  ##    $n+2 - see $3
-  ##  Outputs:
-  ##    $1 - update to reflect assigned object key value pairs.
-  ##
-  ###########################################################################
-  _reflect_field_Set(){
-    local -r this_ref="$1"
-    set -- "${@:2}"
-    while (( $# > 1 )); do
-      eval $this_ref\[\"\$1\"\]\=\"\$2\"
-      shift 2
-    done
-    if (( $# > 0 )); then
-      ScriptUnwind "$LINENO" "Field name: '$1' lacks value."
-    fi
-  }
-  #############################################################################
-  ##
-  ##  Purpose:
-  ##    Encode recurrent method to an object's property value(s).
-  ##
-  ##  Inputs:
-  ##    $1 - The this pointer - reference to an associative map variable.
-  ##    $2 - Object field name
-  ##    $3   Variable to receive field's value.
-  ##    $n+1 - see $2
-  ##    $n+2 - see $3
-  ##  Outputs:
-  ##    $n+2 - update to reflect field value for given field name ($n+1).
-  ##
-  #############################################################################
-  _reflect_field_Get(){
-    local -r this_ref="$1"
-    set -- "${@:2}"
-    while (( $# > 1 )); do
-      eval $2\=\"\$\{$this_ref\[\"\$1\"\]\}\"
-      shift 2
-    done
-    if (( $# > 0 )); then
-      ScriptUnwind "$LINENO" "Field name: '$1' lacks receiving variable name."
-    fi
-  }
-}
-reflect_impl
 ###########################################################################
 ##
 ##  Purpose:
@@ -803,14 +641,21 @@ dkrcp_arg_Image_NoExist_impl(){
   ###########################################################################
   _Create(){
     local -r this_ref="$1"
+    _reflect_type_Set "$this_ref" 'dkrcp_arg_Image_NoExist_impl'
+    _dkrcp_arg_Image_NoExist_Create "${@}"
+  }
+  _dkrcp_arg_Image_NoExist_Create(){
+    local -r this_ref="$1"
     local -r argFileType="$2"
     local -r argFilePath="$3"
     local -r imageName="${TEST_NAME_SPACE}$4"
-    _reflect_type_Set "$this_ref" 'dkrcp_arg_Image_NoExist_impl'
     _reflect_field_Set "$this_ref"    \
       'ArgFileType' "$argFileType"    \
       'ArgFilePath' "$argFilePath"    \
       'ImageName'   "$imageName"
+  }
+  _dkrcp_arg_image_noexist_typename_set(){
+    local -r this_ref="$1"
   }
   dkrcp_arg_Get(){
     local -r this_ref="$1"
@@ -862,9 +707,7 @@ dkrcp_arg_Image_NoExist_impl(){
     local imageName
     _reflect_field_Get "$this_ref" 'ImageName' 'imageName'
     local -r imageName
-    if ! docker images --no-trunc -- $imageName | grep "$dkrcpSTDOUT" >/dev/null; then
-      ScriptUnwind "$LINENO" "Expected imageUUID: '$dkrcpSTDOUT' to correspond to image name: '$imageName'."
-    fi
+    PipeFailCheck 'docker inspect --type=image --format='{{ .Id }}' -- '"$imageName"' | grep '"$dkrcpSTDOUT"' >/dev/null' "$LINENO" "Expected imageUUID: '$dkrcpSTDOUT' to correspond to image name: '$imageName'."
   }
   dkrcp_arg_Destroy(){
     local -r this_ref="$1"
@@ -916,7 +759,56 @@ dkrcp_arg_Image_NoExist_impl(){
     done
   }
 }
-
+dkrcp_arg_Image_NoExist_Target_bad_impl(){
+  dkrcp_arg_Image_NoExist_impl
+  _Create(){
+    local -r this_ref="$1"
+    local -r regExpError="$5"
+    _reflect_type_Set "$this_ref" 'dkrcp_arg_Image_NoExist_Target_bad_impl'
+    _dkrcp_arg_Image_NoExist_Create "${@}"
+    _reflect_field_Set "$this_ref" 'RegExpError' "$regExpError"
+  }
+  dkrcp_arg_output_Inspect(){
+    local -r this_ref="$1"
+    local dkrcpSTDOUT
+    read -r dkrcpSTDOUT
+    local regExpError
+    local imageName
+    _reflect_field_Get "$this_ref"  \
+       'RegExpError' 'regExpError'  \
+       'ImageName'   'imageName'
+    local -r regExpError
+    local -r imageName
+    if ! [[ $dkrcpSTDOUT =~ $regExpError ]]; then
+      ScriptUnwind "$LINENO" "Expected error message to match: '$regExpError', but dkrcp produced: '$dkrcpSTDOUT'."
+    fi
+  }
+}
+dkrcp_arg_Image_NoExist_Docker_Bug_impl(){
+  dkrcp_arg_Image_NoExist_impl
+    #  Implementation below only temporary due to docker cp bug.  Once addressed,
+    #  should be able to delete this interface implementation and
+    #  revert to 'dkrcp_arg_Image_NoExist_impl'"
+  _Create(){
+    local -r this_ref="$1"
+    _reflect_type_Set "$this_ref" 'dkrcp_arg_Image_NoExist_Docker_Bug_impl'
+    _dkrcp_arg_Image_NoExist_Create "${@}"
+  }
+  dkrcp_arg_output_Inspect(){
+    local -r this_ref="$1"
+    local dkrcpSTDOUT
+    read -r dkrcpSTDOUT
+    local imageName
+    _reflect_field_Get "$this_ref" 'ImageName' 'imageName'
+    local -r imageName
+    if docker images --no-trunc -- $imageName | grep "$dkrcpSTDOUT" >/dev/null; then
+      ScriptUnwind "$LINENO" "Docker fixed cp bug replace 'dkrcp_arg_Image_NoExist_Docker_Bug_impl' with 'dkrcp_arg_Image_NoExist_impl'"
+    fi
+    if ! [[ $dkrcpSTDOUT =~ .*no.such.directory ]]; then 
+      ScriptUnwind "$LINENO" "Expected existing docker cp bug to generate: 'no such directory' message but it produced: '$dkrcpSTDOUT'."
+    fi
+  }
+}
 dkrcp_arg_container_exist_impl(){
   dkrcp_arg_interface
   ###########################################################################
@@ -1021,75 +913,6 @@ dkrcp_arg_container_exist_impl(){
     true
   }
 }
-
-###############################################################################
-##
-##  Purpose:
-##    Construct an object's context and then execute a function within this
-##    context.  An object's context refers to all the sub-objects, data members,
-##    encapsulated with in the object itself.
-##
-##  Inputs:
-##    $2 - A function to execute within the constructed context.  The function
-##         must not pass variables.  To pass variables, encapsulate the desired
-##         function call within the body of function.
-##    $1 - A function which generates a serialized stream of object definitions
-##         to SYSOUT.  The serialized stream is defined as:
-##         '<ObjectName>' '<ConcreteObjectType>' ['<ConstructorArgument>']...
-##         '<ObjectName>' = The bash variable name (member name) assigned a 
-##           bash map variable type.
-##         '<ConcreteObjectType>' The concrete type assigned to the object.  A
-##           concrete object type refers to a function that implements one or
-##           more interfaces for the given type.  By convention and necessity,
-##           one of the implemented methods must be named '<ConcreteObjectType>_Create()' 
-##         '<ConstructorArgument>' an argument to be passed to the constructor.
-##
-###############################################################################
-object_Context(){
-  local -r objectSerialFunc="$1"
-  local -r funcClosure="$2"
-  local -a objList
-  local objConstruct
-  while read -r objConstruct; do 
-    eval set -- "$objConstruct"
-    ## $2 represents <ObjectName> 
-    eval local \-\A $2\=\(\)
-    ## $1 represents <ConcreteObjectType>. Establish concrete type's functions as the current ones.
-    $1
-    _Create "${@:2}"
-    objList+=( "$2" )
-  done < <( $objectSerialFunc)
-  ###############################################################################
-  ##
-  ##  Purpose:
-  ##    Iterate over every object in the current object context and execute 
-  ##    a method, implemented by each one that accepts a this pointer and
-  ##    potentially one or more other arguments.
-  ##
-  ##  Note:
-  ##   The current object context may include other inherited object contexts.  If
-  ##   a derived object context defines a variable with same name as an inherited
-  ##   one, the variable within the derived context hides the inherited one.
-  ##
-  ##  Inputs:
-  ##    $1 - A function name to execute that's implemented for every object in
-  ##         the provided context.  The function may pass variables.
-  ##
-  ###############################################################################
-  object_list_Iterate(){
-    local -r funcClosure="$1"
-    local ixObj
-    local typeCurrent=''
-    for (( ixObj=0; ixObj < ${#objList[@]}; ixObj++ )) 
-    do
-      local objName="${objList[$ixObj]}"
-      # performance optimization
-      reflect_type_ActiveOptimize "$objName" 'typeCurrent'
-      $funcClosure "$objName" "${@:2}"
-    done
-  }
-  eval $funcClosure
-}
 ###############################################################################
 ##
 ##  Purpose:
@@ -1183,17 +1006,18 @@ test_element_interface(){
   ###############################################################################
   ##
   ##  Purpose:
-  ##    Analyze the SDTOUT & STDERR stream generated by executing the dkrcp
-  ##    command to ensure presents the expected output.
+  ##    Analyze the environment after executing the dkrcp pipeline.  At this
+  ##    juncture, dkrcp has terminated and can no longer affect the environment.
   ##
   ##  Inputs:
-  ##    STDIN - STDOUT & STDERR of dkrcp command.
+  ##    Environment, such as local Docker repository.
   ##
   ##  Outputs:
-  ##    Nothing if actual command ouput matches expected output.
+  ##    Nothing if expected environment matches actual one.  Otherwise a 
+  ##    message to STDERR which terminates execution.
   ##
   ###############################################################################
-  test_element_behavior_Expect(){
+  test_element_environ_Inspect(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
   }
 }
@@ -1391,9 +1215,13 @@ test_element_impl(){
       local -r dkrcpTargetArg
       eval "$dkrcpPrequelCmdStream" | eval dkrcp.sh "$dkrcpSourcArgs" "$dkrcpTargetArg" \2\>\&1 | dkrcp_arg_output_Inspect "$testTargetArg_ref"
       local -r dkrcpRunStatus="${PIPESTATUS[@]}"
-      if ! [[ $dkrcpRunStatus =~ ^....0 ]]; then
+      if ! [[ $dkrcpRunStatus =~ ^0.[0-9]+.0 ]]; then
         # output inspection detected an unexpected problem terminate testing
-        exit 1;
+        exit 1
+      fi
+      if ! test_element_environ_Inspect; then
+        # environment inspection detected an unexpected problem terminate testing
+        exit 1
       fi
       if ! [[ $dkrcpRunStatus =~ ^..0.. ]]; then
         # dkrcp command indicated problem with command.  However the output inspector
@@ -1473,15 +1301,29 @@ test_element_impl(){
     dkrcp_arg_resource_Bind "$testTargetArg_ref"
     # invoke the dkrcp copy command.
     if _dkrcp_Run; then
-      # since dkrcp copy was successful, compare models 
+      # since dkrcp copy was successful, compare models
       _test_element_model_expected_Create
       _test_element_model_result_Create
       _test_element_models_Compare
     fi
   }
 }
+###############################################################################
+##
+##  A test element doesn't require a this pointer. Since the implementation
+##  is common to all tests, instantiate the common public implementation once.
+##
+###############################################################################
+test_element_impl
+##############################################################################
+##
+##  Section:
+##    Tests definitions.
+##
+###############################################################################
+
 dkrcp_test_EnvCheck(){
-  test_element_env_Check "$1"
+  test_element_env_Check
 }
 dkrcp_test_Run(){
   test_element_Run
@@ -1489,13 +1331,9 @@ dkrcp_test_Run(){
 dkrcp_test_EnvClean(){
   test_element_env_Clean
 }
-###############################################################################
-##
-##  A test element doesn't require a this pointer and since the implementation
-##  is common to all tests, instantiate the common public implementation once.
-##
-###############################################################################
-test_element_impl
+
+
+
 dkrcp_test_1(){
   test_element_test_1_imp(){
     test_element_interface
@@ -1509,17 +1347,20 @@ dkrcp_test_1(){
       testSourceArgList=( 'hostFileA' )
       testTargetArg_ref='imageNameTest1'
     }
+    test_element_environ_Inspect(){
+      true
+    }
   }
   test_element_test_1_imp
   dkrcp_test_Desc(){
-    echo "Create an image by copying a single host file into it. The host" \
-         "and target files are identical.  The target file should exist "  \
-         "in the root directory of the image."
+    echo "Create an image by copying a single host file into the image's root directory."  \
+         "The host and target file paths are identical.  Outcome: new image with "         \
+         "replica of host file in its root directory."
   }
 }
 ###############################################################################
 dkrcp_test_2(){
-  test_element_test_2_imp(){
+  test_element_test_1_imp(){
     test_element_interface
     test_element_member_Def(){
       echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFileA'       'f' 'a' 'file_content_reflect_name' "
@@ -1531,16 +1372,72 @@ dkrcp_test_2(){
       testSourceArgList=( 'hostFileA' )
       testTargetArg_ref='imageNameTest1'
     }
+    test_element_environ_Inspect(){
+      true
+    }
   }
-  test_element_test_2_imp
+  test_element_test_1_imp
   dkrcp_test_Desc(){
-    echo "Create an image by copying a single host file into it. The host" \
-         "and target files are identical.  The target file should exist "  \
-         "in the root directory of the image."
+    echo "Create an image by copying a single host file into the image's root directory."  \
+         "The host and target file names are identical.  Outcome: new image with "         \
+         "replica of host file in its root directory."
   }
 }
 ###############################################################################
+#  Although test 3 fails due to bug in Docker cp command, it currently passes.
+#  However it will fail once Docker fixes cp.
+###############################################################################
 dkrcp_test_3(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFileA'       'f' 'a' 'file_content_reflect_name' "
+      echo " 'dkrcp_arg_Image_NoExist_Docker_Bug_impl'       'imageNameTest1'  'f' ''  'test_3' "
+      echo " 'audit_model_impl'                              'modelExpected'    'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'      'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'hostFileA' )
+      testTargetArg_ref='imageNameTest1'
+    }
+    test_element_environ_Inspect(){
+      true
+    }
+  }
+  test_element_test_1_imp
+  dkrcp_test_Desc(){
+    echo "Create an image by copying a single host file into the image's root directory."  \
+         "The host file name is specified but not the target.  Outcome: new image with "   \
+         "replica of host file in its root directory."
+  }
+}
+###############################################################################
+dkrcp_test_4(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFileA'       'f' 'a' 'file_content_reflect_name' "
+      echo " 'dkrcp_arg_Image_NoExist_Target_bad_impl'       'imageNameTest1'  'd' 'dirDoesNotExist/z'  'test_4' '^Error.+no.such.file.or.directory' "
+      echo " 'audit_model_impl'                              'modelExpected'    'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'      'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'hostFileA' )
+      testTargetArg_ref='imageNameTest1'
+    }
+    test_element_environ_Inspect(){
+      if docker inspect --type=image -- $imageName 2>&1 >/dev/null; then 
+        ScriptUnwind "$LINENO" "Image: '$imageName' should not exist but it does."
+      fi
+  }
+  test_element_test_1_imp
+  dkrcp_test_Desc(){
+    echo "Attempt to create an image by copying a single host file into a nonexistent  root directory."  \
+         "Outcome: Copy should fail because target directory doesn't exist and image should not exist."
+  }
+}
+###############################################################################
+dkrcp_test_x(){
   test_element_test_1_imp(){
     test_element_interface
     test_element_member_Def(){
@@ -1578,7 +1475,7 @@ dkrcp_test_3(){
          "in the root directory of the image."
   }
 }
-dkrcp_test_4(){
+dkrcp_test_x4(){
   test_element_test_1_imp(){
     test_element_interface
     test_element_member_Def(){
