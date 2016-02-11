@@ -13,6 +13,7 @@ source "ArgumentsGetInclude.sh";
 source "ArrayMapTestInclude.sh";
 source "VirtCmmdInterface.sh";
 source "TestFramework.sh";
+source "ObjectReflectFramework.sh"
 
 ###############################################################################
 ##
