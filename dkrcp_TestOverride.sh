@@ -153,24 +153,35 @@ audit_model_impl(){
   ###########################################################################
   audit_model_path_write_Configure(){
     local -r this_ref="$1"
-    local -r targetFileType="$2
-    local -r targetFilePath="$3
+    local -r targetFileType="$2"
+    local -r targetFilePath="$3"
     local -r targetDirExist="$4"
     local modelRootPath
     audit_model_root_path_Get "$this_ref" 'modelRootPath'
     local -r modelRootPath
-    dirInModel="$targetFilePath"
+    local dirToReplicate="$targetFilePath"
     if [ "$targetFileType" == 'f' ]; then
-      dirInModel="$(dirname "$targetFilePath")"
+      dirToReplicate="$( dirname "$targetFilePath")"
+    elif [ "$targetFileType" == 'd' ]; then
+      if ! $targetDirExist; then
+        dirToReplicate="$( dirname "$targetFilePath")"
+      fi
+    else
+      ScriptUnwind "$LINENO" "Unknown target type: '$targetFileType'.  Must be 'f' - for file or 'd' - for directory."
     fi
-    _reflect_field_Set "$this_ref" 'ModelWritePath' "${modelRootPath}${dirInModel}"
-    local dirToReplicate="$dirInModel"
-    if [ "$targetFileType" == 'd' ] && ! $targetDirExist; then
-      dirToReplicate="$(dirname "$targetFilePath")"
+    if (( ${#dirToReplicate} < 3 )) && ( [ "$dirToReplicate" == '/' ] || [ "$dirToReplicate" == '.' ] || [ "$dirToReplicate" == '/.' ] ); then
+      dirToReplicate=''
     fi
-    if ! mkdir -p "${modelRootPath}${dirToReplicate}" >/dev/null; then
+    local -r dirToReplicate
+    local dirSep='/'
+    if [ "${targetFilePath:0:1}" == '/' ]; then dirSep=''; fi 
+    local -r dirSep
+    #ScriptDebug "$LINENO" "model make dir: ${modelRootPath}${dirSep}${dirToReplicate}"
+    if ! mkdir -p "${modelRootPath}${dirSep}${dirToReplicate}" >/dev/null; then
       ScriptUnwind "$LINENO" "Replicating target directory path:'${dirToReplicate}' within model failed: '${modelRootPath}'"
     fi
+    _reflect_field_Set "$this_ref" 'ModelWritePath' "${modelRootPath}${dirSep}${targetFilePath}"
+    #ScriptDebug "$LINENO" "model write path: ${modelRootPath}${dirSep}${targetFilePath}"
   }
   ###########################################################################
   ##
@@ -351,6 +362,23 @@ dkrcp_arg_interface(){
   dkrcp_arg_output_Inspect(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
   }
+  ###############################################################################
+  ##
+  ##  Purpose:
+  ##    Analyze the environment after executing the dkrcp pipeline.  At this
+  ##    juncture, dkrcp has terminated and can no longer affect the environment.
+  ##
+  ##  Inputs:
+  ##    Environment, such as local Docker repository.
+  ##
+  ##  Outputs:
+  ##    When successful: Nothing if expected environment matches actual one.
+  ##    Otherwise:       A message to STDERR & testing termination.
+  ##
+  ###############################################################################
+  dkrcp_arg_environ_Inspect(){
+    true
+  }
   ###########################################################################
   ##
   ##  Purpose:
@@ -425,7 +453,9 @@ hostfilepathname_dependent_impl(){
     local resourceFilePath
     _reflect_field_Get "$this_ref" 'ResourceFilePath' 'resourceFilePath'
     local -r resourceFilePath
-    file_path_safe_Remove "$resourceFilePath" >/dev/null
+    if [ -e "$resourceFilePath" ]; then
+      ScriptDetectNotify "host file: '$resourceFilePath', involved in testing."
+    fi
   }
   env_clean_interface
   env_Clean(){
@@ -480,18 +510,7 @@ dkrcp_arg_hostfilepath_hostfilepathExist_impl(){
   }
   dkrcp_arg_Destroy(){
     local -r this_ref="$1"
-    local resourceFilePath
-    _reflect_field_Get "$this_ref" 'ResourceFilePath' 'resourceFilePath'
-    local -r resourceFilePath
-    file_path_safe_Remove "$resourceFilePath" >/dev/null
-  }
-  env_clean_interface
-  env_Clean(){
-    dkrcp_arg_Destroy "$1"
-  }
-  env_check_interface
-  env_Check(){
-    hostfilepathname_dependent_Check "$1"
+    hostfilepathname_dependent_Delete "$this_ref"
   }
 }
 dkrcp_arg_hostfilepath_hostfilepathNotExist_impl(){
@@ -633,7 +652,8 @@ dkrcp_arg_Image_NoExist_impl(){
   ##         'f' - file path resolves to a file.
   ##         'd' - file path resolves to a directory.
   ##    $3 - dkrcp image file path.
-  ##    $4 - Image name.
+  ##    $4 - file path exists
+  ##    $5 - Image name.
   ##
   ##  Outputs:
   ##    $1 - A constructed this pointer.
@@ -648,11 +668,15 @@ dkrcp_arg_Image_NoExist_impl(){
     local -r this_ref="$1"
     local -r argFileType="$2"
     local -r argFilePath="$3"
-    local -r imageName="${TEST_NAME_SPACE}$4"
-    _reflect_field_Set "$this_ref"    \
-      'ArgFileType' "$argFileType"    \
-      'ArgFilePath' "$argFilePath"    \
-      'ImageName'   "$imageName"
+    local argFilePathExist='false'
+    if [ "$4" == 'true' ]; then argFilePathExist='true'; fi
+    local -r argFilePathExist
+    local -r imageName="${TEST_NAME_SPACE}$5"
+    _reflect_field_Set "$this_ref"           \
+      'ArgFileType'      "$argFileType"      \
+      'ArgFilePath'      "$argFilePath"      \
+      'ArgFilePathExist' "$argFilePathExist" \
+      'ImageName'        "$imageName"
   }
   _dkrcp_arg_image_noexist_typename_set(){
     local -r this_ref="$1"
@@ -677,8 +701,8 @@ dkrcp_arg_Image_NoExist_impl(){
     local -r argFilePathExist_ref="$4"
     _reflect_field_Get "$this_ref"                \
       'ArgFileType'        "$argFileType_ref"     \
-      'ArgFilePath'        "$argFilePath_ref"
-    ref_simple_value_Set "$argFilePathExist_ref" 'false'
+      'ArgFilePath'        "$argFilePath_ref"     \
+      'ArgFilePathExist'   "$argFilePathExist_ref"
   }
   dkrcp_arg_model_Write(){
     local -r this_ref="$1"
@@ -688,16 +712,18 @@ dkrcp_arg_Image_NoExist_impl(){
     _reflect_field_Get "$this_ref"   \
       'ImageName'       'imageName'  \
       'ArgFilePath'     'imageFilePath'
+            'ArgFilePathExist'   "$argFilePathExist_ref"
+      
     local -r imageName
     local -r imageFilePath
     local containerID
     image_container_Create "$imageName" 'containerID'
     local -r containerID
     if ! docker cp "$containerID:$imageFilePath" "$modelPath" >/dev/null; then
-      ScripUnwind "$LINENO" "Failure when attempting to copy: '$imageFilePath' from container: '$containerID' derived from image: '$imageName' to model path: '$modelPath'."
+      ScriptUnwind "$LINENO" "Failure when attempting to copy: '$imageFilePath' from container: '$containerID' derived from image: '$imageName' to model path: '$modelPath'."
     fi
     if ! docker rm $containerID >/dev/null; then
-      ScripUnwind "$LINENO" "Failure while deleting container: '$containerID' derived from image: '$imageName' after constructing model."
+      ScriptUnwind "$LINENO" "Failure while deleting container: '$containerID' derived from image: '$imageName' after constructing model."
     fi
   }
   dkrcp_arg_output_Inspect(){
@@ -707,7 +733,7 @@ dkrcp_arg_Image_NoExist_impl(){
     local imageName
     _reflect_field_Get "$this_ref" 'ImageName' 'imageName'
     local -r imageName
-    PipeFailCheck 'docker inspect --type=image --format='{{ .Id }}' -- '"$imageName"' | grep '"$dkrcpSTDOUT"' >/dev/null' "$LINENO" "Expected imageUUID: '$dkrcpSTDOUT' to correspond to image name: '$imageName'."
+    PipeFailCheck 'docker inspect --type=image --format='"'{{ .Id }}'"' -- '"$imageName"' | grep '"$dkrcpSTDOUT"' >/dev/null' "$LINENO" "Expected imageUUID: '$dkrcpSTDOUT' to correspond to image name: '$imageName'."
   }
   dkrcp_arg_Destroy(){
     local -r this_ref="$1"
@@ -763,7 +789,7 @@ dkrcp_arg_Image_NoExist_Target_bad_impl(){
   dkrcp_arg_Image_NoExist_impl
   _Create(){
     local -r this_ref="$1"
-    local -r regExpError="$5"
+    local -r regExpError="$6"
     _reflect_type_Set "$this_ref" 'dkrcp_arg_Image_NoExist_Target_bad_impl'
     _dkrcp_arg_Image_NoExist_Create "${@}"
     _reflect_field_Set "$this_ref" 'RegExpError' "$regExpError"
@@ -773,14 +799,19 @@ dkrcp_arg_Image_NoExist_Target_bad_impl(){
     local dkrcpSTDOUT
     read -r dkrcpSTDOUT
     local regExpError
-    local imageName
-    _reflect_field_Get "$this_ref"  \
-       'RegExpError' 'regExpError'  \
-       'ImageName'   'imageName'
+    _reflect_field_Get "$this_ref" 'RegExpError' 'regExpError' 
     local -r regExpError
-    local -r imageName
     if ! [[ $dkrcpSTDOUT =~ $regExpError ]]; then
       ScriptUnwind "$LINENO" "Expected error message to match: '$regExpError', but dkrcp produced: '$dkrcpSTDOUT'."
+    fi
+  }
+  dkrcp_arg_environ_Inspect(){
+    local -r this_ref="$1"
+    local imageName
+    _reflect_field_Get "$this_ref" 'ImageName'   'imageName'
+    local -r imageName
+    if docker inspect --type=image -- $imageName 2>&1 >/dev/null; then 
+      ScriptUnwind "$LINENO" "Image: '$imageName' should not exist but it does."
     fi
   }
 }
@@ -882,7 +913,7 @@ dkrcp_arg_container_exist_impl(){
     local -r containerID
     local -r containerFilePath
     if ! docker cp "$containerID:$containerFilePath" "$modelPath" >/dev/null; then
-      ScripUnwind "$LINENO" "Failure when attempting to copy: '$containerFilePath' from container: '$containerID' to model path: '$modelPath'."
+      ScriptUnwind "$LINENO" "Failure when attempting to copy: '$containerFilePath' from container: '$containerID' to model path: '$modelPath'."
     fi
   }
   dkrcp_arg_output_Inspect(){
@@ -900,7 +931,7 @@ dkrcp_arg_container_exist_impl(){
     if [ -z "$containerID"]; then return; fi
     # bind was performed and the container id exists :: delete it.
     if ! docker rm -f "$containerID" >/dev/null; then
-      ScripUnwind "$LINENO" "Failure when attempting to remove container: '$containerID'."
+      ScriptUnwind "$LINENO" "Failure when attempting to remove container: '$containerID'."
     fi
   }
   env_clean_interface
@@ -1003,23 +1034,7 @@ test_element_interface(){
   test_element_args_Catgry(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
   }
-  ###############################################################################
-  ##
-  ##  Purpose:
-  ##    Analyze the environment after executing the dkrcp pipeline.  At this
-  ##    juncture, dkrcp has terminated and can no longer affect the environment.
-  ##
-  ##  Inputs:
-  ##    Environment, such as local Docker repository.
-  ##
-  ##  Outputs:
-  ##    Nothing if expected environment matches actual one.  Otherwise a 
-  ##    message to STDERR which terminates execution.
-  ##
-  ###############################################################################
-  test_element_environ_Inspect(){
-    ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
-  }
+
 }
 ###############################################################################
 ##
@@ -1219,7 +1234,7 @@ test_element_impl(){
         # output inspection detected an unexpected problem terminate testing
         exit 1
       fi
-      if ! test_element_environ_Inspect; then
+      if ! dkrcp_arg_environ_Inspect "$testTargetArg_ref"; then
         # environment inspection detected an unexpected problem terminate testing
         exit 1
       fi
@@ -1315,13 +1330,13 @@ test_element_impl(){
 ##
 ###############################################################################
 test_element_impl
-##############################################################################
+###############################################################################
 ##
-##  Section:
-##    Tests definitions.
+##  All tests below adhere to same interface, they all plugin to the testing
+##  framework using the identical interface methods, therefore, define the
+##  implementation of these framework methods only once.
 ##
 ###############################################################################
-
 dkrcp_test_EnvCheck(){
   test_element_env_Check
 }
@@ -1331,24 +1346,24 @@ dkrcp_test_Run(){
 dkrcp_test_EnvClean(){
   test_element_env_Clean
 }
-
-
-
+##############################################################################
+##
+##  Section:
+##    Tests definitions.
+##
+###############################################################################
 dkrcp_test_1(){
   test_element_test_1_imp(){
     test_element_interface
     test_element_member_Def(){
-      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFileA'       'f' '/a' 'file_content_reflect_name' "
-      echo " 'dkrcp_arg_Image_NoExist_impl'                  'imageNameTest1'  'f' '/a' 'test_1' "
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_a'       'f' '/a' 'file_content_reflect_name' "
+      echo " 'dkrcp_arg_Image_NoExist_impl'                  'imageNameTest'    'f' '/a' 'false' 'test_1' "
       echo " 'audit_model_impl'                              'modelExpected'    'modelexpected' "
       echo " 'audit_model_impl'                              'modelResult'      'modelresult' "
     }
     test_element_args_Catgry(){
-      testSourceArgList=( 'hostFileA' )
-      testTargetArg_ref='imageNameTest1'
-    }
-    test_element_environ_Inspect(){
-      true
+      testSourceArgList=( 'hostFile_a' )
+      testTargetArg_ref='imageNameTest'
     }
   }
   test_element_test_1_imp
@@ -1363,17 +1378,14 @@ dkrcp_test_2(){
   test_element_test_1_imp(){
     test_element_interface
     test_element_member_Def(){
-      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFileA'       'f' 'a' 'file_content_reflect_name' "
-      echo " 'dkrcp_arg_Image_NoExist_impl'                  'imageNameTest1'  'f' 'a' 'test_2' "
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_a'       'f' 'a' 'file_content_reflect_name' "
+      echo " 'dkrcp_arg_Image_NoExist_impl'                  'imageNameTest'    'f' 'a' 'false' 'test_2'  "
       echo " 'audit_model_impl'                              'modelExpected'    'modelexpected' "
       echo " 'audit_model_impl'                              'modelResult'      'modelresult' "
     }
     test_element_args_Catgry(){
-      testSourceArgList=( 'hostFileA' )
-      testTargetArg_ref='imageNameTest1'
-    }
-    test_element_environ_Inspect(){
-      true
+      testSourceArgList=( 'hostFile_a' )
+      testTargetArg_ref='imageNameTest'
     }
   }
   test_element_test_1_imp
@@ -1391,17 +1403,14 @@ dkrcp_test_3(){
   test_element_test_1_imp(){
     test_element_interface
     test_element_member_Def(){
-      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFileA'       'f' 'a' 'file_content_reflect_name' "
-      echo " 'dkrcp_arg_Image_NoExist_Docker_Bug_impl'       'imageNameTest1'  'f' ''  'test_3' "
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_a'       'f' 'a' 'file_content_reflect_name' "
+      echo " 'dkrcp_arg_Image_NoExist_Docker_Bug_impl'       'imageNameTest'    'f' ''  'false' 'test_3' "
       echo " 'audit_model_impl'                              'modelExpected'    'modelexpected' "
       echo " 'audit_model_impl'                              'modelResult'      'modelresult' "
     }
     test_element_args_Catgry(){
-      testSourceArgList=( 'hostFileA' )
-      testTargetArg_ref='imageNameTest1'
-    }
-    test_element_environ_Inspect(){
-      true
+      testSourceArgList=( 'hostFile_a' )
+      testTargetArg_ref='imageNameTest'
     }
   }
   test_element_test_1_imp
@@ -1416,24 +1425,98 @@ dkrcp_test_4(){
   test_element_test_1_imp(){
     test_element_interface
     test_element_member_Def(){
-      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFileA'       'f' 'a' 'file_content_reflect_name' "
-      echo " 'dkrcp_arg_Image_NoExist_Target_bad_impl'       'imageNameTest1'  'd' 'dirDoesNotExist/z'  'test_4' '^Error.+no.such.file.or.directory' "
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_a'       'f' 'a' 'file_content_reflect_name' "
+      echo " 'dkrcp_arg_Image_NoExist_impl'                  'imageNameTest'    'f' 'q' 'false' 'test_4' "
       echo " 'audit_model_impl'                              'modelExpected'    'modelexpected' "
       echo " 'audit_model_impl'                              'modelResult'      'modelresult' "
     }
     test_element_args_Catgry(){
-      testSourceArgList=( 'hostFileA' )
-      testTargetArg_ref='imageNameTest1'
+      testSourceArgList=( 'hostFile_a' )
+      testTargetArg_ref='imageNameTest'
     }
-    test_element_environ_Inspect(){
-      if docker inspect --type=image -- $imageName 2>&1 >/dev/null; then 
-        ScriptUnwind "$LINENO" "Image: '$imageName' should not exist but it does."
-      fi
+  }
+  test_element_test_1_imp
+  dkrcp_test_Desc(){
+    echo "Create an image by copying a single host file into the image's root directory."     \
+         "The target name differs from the source.  Outcome: new image with a file whose"   \
+         "contents are identical to the host file but whose name differs located in the root."
+  }
+}
+###############################################################################
+dkrcp_test_5(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_a'       'f' 'a' 'file_content_reflect_name' "
+      echo " 'dkrcp_arg_Image_NoExist_Target_bad_impl'       'imageNameTest'    'd' 'dirDoesNotExist/' 'false' 'test_5' '^.*no.such.directory' "
+      echo " 'audit_model_impl'                              'modelExpected'    'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'      'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'hostFile_a' )
+      testTargetArg_ref='imageNameTest'
+    }
   }
   test_element_test_1_imp
   dkrcp_test_Desc(){
     echo "Attempt to create an image by copying a single host file into a nonexistent  root directory."  \
-         "Outcome: Copy should fail because target directory doesn't exist and image should not exist."
+         "Outcome: Failure target directory doesn't exist. Also, image should not exist."
+  }
+}
+###############################################################################
+dkrcp_test_6(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_a'    'd' 'dir_a'     'file_content_dir_create'  "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_a'  'f' 'dir_a/a'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_b'  'f' 'dir_a/b'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_c'  'f' 'dir_a/c'   'file_content_reflect_name' "
+      echo " 'dkrcp_arg_Image_NoExist_impl'                  'imageNameTest'     'd' 'dir_image' 'false' 'test_6' "
+      echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=(  'hostFile_dir_a' )
+      testDependArgList=(  'hostFile_dir_a_a' )
+      testDependArgList+=( 'hostFile_dir_a_b' )
+      testDependArgList+=( 'hostFile_dir_a_c' )
+      testTargetArg_ref='imageNameTest'
+    }
+  }
+  test_element_test_1_imp
+  dkrcp_test_Desc(){
+    echo "Create an image by copying a directory single host file into it. The target"  \
+         "directory does not exist.  Outcome: New image created with target directory"  \
+         "reflecting the contents of source directory."
+  }
+}
+###############################################################################
+dkrcp_test_7(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_a'    'd' 'dir_a'     'file_content_dir_create'  "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_a'  'f' 'dir_a/a'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_b'  'f' 'dir_a/b'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_c'  'f' 'dir_a/c'   'file_content_reflect_name' "
+      echo " 'dkrcp_arg_Image_NoExist_impl'                  'imageNameTest'     'd' 'dev/pts/'   'true' 'test_7' "
+      echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=(  'hostFile_dir_a' )
+      testDependArgList=(  'hostFile_dir_a_a' )
+      testDependArgList+=( 'hostFile_dir_a_b' )
+      testDependArgList+=( 'hostFile_dir_a_c' )
+      testTargetArg_ref='imageNameTest'
+    }
+  }
+  test_element_test_1_imp
+  dkrcp_test_Desc(){
+    echo "Create an image by copying a directory single host file into it. The target"  \
+         "directory exists.  Outcome: New image created with target directory"  \
+         "containing the source directory."
   }
 }
 ###############################################################################
