@@ -282,7 +282,7 @@ TestEnvironmentAssert(){
     ScriptError 'One or more remnants were detected during the scan.'
     ScriptError 'Check to ensure remnants refer to test artifacts.'
     ScriptError 'If the remnants are unwanted test artifacts, rerun specifying'
-    ScriptError '"'"--no-check"'" option to delete them before executing'
+    ScriptError '"'"--no-scan"'" option to delete them before executing'
     ScriptError 'a specific test.'
     ScriptUnwind "$LINENO" "Scan detected artifacts in environment that overlap ones produced during testing."
   fi
