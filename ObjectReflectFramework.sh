@@ -209,12 +209,24 @@ object_Context(){
   ##   one, the variable within the derived context hides the inherited one.
   ##
   ##  Inputs:
-  ##    $1 - A function name to execute that's implemented for every object in
-  ##         the provided context.  The function may pass variables.
+  ##    $1 - Error notification setting:
+  ##           ImmediateNotify - Terminate iterator on first detected error.
+  ##           AtEntNotify     - Ignore errors until after visiting all elements.
+  ##    $2 - A function name to execute that's implemented for every object in
+  ##         the provided context.
+  ##    $3 - Optional list of variables to forward to method.
   ##
   ###############################################################################
   object_list_Iterate(){
-    local -r funcClosure="$1"
+    local -r notifyWhen="$1"
+    local -r funcClosure="$2"
+    local errorSemantics='continue'
+    if     [ "$notifyWhen" == "ImmediateNotify" ]; then errorSemantics='break'
+    elif ! [ "$notifyWhen" == "AtEndNotify" ]; then
+      ScriptUnwind "$LINENO" "Uknown error behavior: '$notifyWhen'.  Should be 'ImmediateNotify' or 'AtEndNotify'."
+    fi
+    local -r errorSemantics
+    local errorInd='false'
     local ixObj
     local typeCurrent=''
     for (( ixObj=0; ixObj < ${#objList[@]}; ixObj++ )) 
@@ -222,8 +234,11 @@ object_Context(){
       local objName="${objList[$ixObj]}"
       # performance optimization
       reflect_type_ActiveOptimize "$objName" 'typeCurrent'
-      $funcClosure "$objName" "${@:2}"
+      if $funcClosure "$objName" "${@:3}"; then continue; fi
+      errorInd='true'
+      $errorSemantics
     done
+    if $errorInd; then false; fi
   }
   eval $funcClosure
 }
