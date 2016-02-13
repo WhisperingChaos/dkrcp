@@ -342,18 +342,20 @@ TestFunctionExecTemplate(){
   local -r notifyWhen="$1"
   local -r funcToExecute="$2"
   local errorInd='false'
+  local errorSemantics
+  if     [ "$notifyWhen" == "ImmediateNotify" ]; then errorSemantics='break'
+  elif ! [ "$notifyWhen" == "AtEndNotify" ]; then
+    ScriptUnwind "$LINENO" "Uknown error behavior: '$notifyWhen'.  Should be 'ImmediateNotify' or 'AtEndNotify'."
+  fi
+  local -r errorSemantics
   local testFunctionName
   while read testFunctionName; do
     $testFunctionName
     ScriptInform "Test: '$testFunctionName' Function: '$funcToExecute'."
-     if ! ${TEST_NAME_SPACE}$funcToExecute "${@:3}"; then
-       ScriptError "Test: '$testFunctionName' Function: '$funcToExecute' Failed.'"
-       if [ "$notifyWhen" == "ImmediateNotify" ]; then exit 1; fi
-       if [ "$notifyWhen" == "AtEndNotify" ]; then
-         errorInd='true'
-         continue
-       fi
-       ScriptUnwind "$LINENO" "On error notify directive not supported: '$notifyWhen'."
+    if ! ${TEST_NAME_SPACE}$funcToExecute "${@:3}"; then
+      ScriptError "Test: '$testFunctionName' Function: '$funcToExecute' Failed.'"
+      errorInd='true'
+      $errorSemantics
     fi
     ScriptInform "Test: '$testFunctionName' Function: '$funcToExecute' Successful.'"
   done
