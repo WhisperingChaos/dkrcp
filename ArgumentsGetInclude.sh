@@ -10,10 +10,10 @@
 ##  Assumption:
 ##    Since bash variable names are passed to this routine, these names
 ##    cannot overlap the variable names locally declared within the
-##    scope of this routine or its decendents.
+##    scope of this routine or its descendants.
 ##
 ##  Input:
-##    $1 - Variable name to a standard array containin the option/argument
+##    $1 - Variable name to a standard array containing the option/argument
 ##         values passed from the command line.
 ##    $2 - Variable name to standard array which will contain 
 ##         associative array keys ordered by their position
@@ -23,6 +23,10 @@
 ##         label or "ArgN" for arguments that don't immediately
 ##         follow an option.  Where "N" is the argument's position
 ##         relative to other arguments.
+##    $4 - (optional or '') Variable name to a standard array enumerating
+##         options that can be used more than once on the command line.
+##    $5 - (optional or '') Token type to assign to a single - surrounded
+##         by whitespace.  
 ## 
 ##  Output:
 ##    $2 - Variable name to standard array which will contain 
@@ -42,6 +46,18 @@ function ArgumentsParse () {
   local -r cmmdLnArgListNm="$1"
   local -r argumentListNm="$2"
   local -r argumentMapNm="$3"
+  local -A optionRepeatMap
+  local optionRepeatCheckFun=''
+  if [ -n "$4" ]; then
+    OptionRepeatMapInit 'optionRepeatMap' "$4"
+  fi
+  if (( ${#optionRepeatMap[@]} > 0 )); then
+    optionRepeatCheckFun='OptionRepeatCheck optionRepeatMap optionName'
+  fi
+  local -r optionRepeatCheckFun
+  local singleDashTokenClass='BeginArgs'
+  if [ "$5" == 'Argument' ]; then singleDashTokenClass='Argument'; fi
+  local -r singleDashTokenClass
   eval local -r tokenMaxCnt=\"\$\{\#$cmmdLnArgListNm\[\@\]\}\"
   local tokenClass
   local tokenValue
@@ -51,11 +67,12 @@ function ArgumentsParse () {
   local -i tokenIx
   for (( tokenIx=0 ; tokenIx < tokenMaxCnt ; ++tokenIx )); do
     eval local tokenValue=\"\$\{$cmmdLnArgListNm\[\$tokenIx\]\}\"
-    TokenClass "$tokenValue" 'tokenClass'
+    TokenClass "$tokenValue" "$singleDashTokenClass" 'tokenClass'
     case "$stateCurr" in
       stateOptArg)
         if [ "$tokenClass" == 'Option' ]; then
           OptionSplit "$tokenValue" 'optionName' 'optionValue'
+          eval $optionRepeatCheckFun
           eval $argumentMapNm\[\"\$optionName\"\]=\"\$optionValue\"
           eval $argumentListNm\[\$argumentListIx\]=\"\$optionName\"
           (( ++argumentListIx ))
@@ -72,6 +89,7 @@ function ArgumentsParse () {
       stateOption)
         if [ "$tokenClass" == 'Option' ]; then
           OptionSplit "$tokenValue" 'optionName' 'optionValue'
+          eval $optionRepeatCheckFun
           eval $argumentMapNm\[\"\$optionName\"\]=\"\$optionValue\"
           eval $argumentListNm\[\$argumentListIx\]=\"\$optionName\"
           (( ++argumentListIx ))
@@ -92,15 +110,16 @@ function ArgumentsParse () {
       *) return 1 ;;
     esac
   done
-  return 0;
 }
 ###############################################################################
 ##
 ##  Purpose:
-##    Examines the current token to determine if its token class:
-##      1. 'Option' - an option: begins with '-'
-##      2. 'BeginArgs' - end of option/begining of only arguments indicator: equals '--'
-##      3. 'Argument' - otherwise its considered an argument.
+##    Examines the current token to determine its token class:
+##      1. 'Option'    - an option: begins with '-' is immediately followed
+##                       one or more characters that aren't whitespace.
+##      2. 'BeginArgs' - end of option/begining of only arguments indicator:
+##                       equals only: '--' or '-'
+##      3. 'Argument'  - otherwise its considered an argument.
 ##
 ##  Assumption:
 ##    Since bash variable names are passed to this routine, these names
@@ -108,35 +127,31 @@ function ArgumentsParse () {
 ##    scope of this routine or its decendents.
 ##
 ##  Input:
-##    $1 - Variable name to a standard array containin the option/argument
-##         values passed from the command line.
-##    $2 - Variable name to standard array which will contain 
-##         associative array keys ordered by their position
-##         in command line.
-##    $3 - Variable name to associative array which will contain
-##         argument values and be keyed by either the option
-##         label or "ArgN" for arguments that don't immediately
-##         follow an option.  Where "N" is the argument's position
-##         relative to other arguments.
+##    $1 - Token value: can be an entire option, argument or directive like '--' 
+##    $2 - Token class assigned to a '-' surrounded by whitespace. It can be
+##         configured as BeginArgs or as an 'Argument'. 
+##    $3 - Variable name to return the determined class for the current token.
 ## 
 ##  Output:
-##    $2 - Variable name will be assigned token class.
+##    $3 - Variable name will be assigned token class.
 ##
 ###############################################################################
 function TokenClass () {
   local -r tokenValue="$1"
-  local -r tokenClassNM="$2"
+  local -r singleDashTokenClass="$2"
+  local -r tokenClassNM="$3"
   # default classification is 'Argument'
-  eval $tokenClassNM=\'Argument\'
+  eval $tokenClassNM\=\'Argument\'
   if [ "${tokenValue:0:1}" == '-' ]; then
     if [ "${tokenValue}" == '--' ] ; then 
-      eval $tokenClassNM=\'BeginArgs\'
-    elif [ "${tokenValue}" != '-' ]; then
+      eval $tokenClassNM\=\'BeginArgs\'
+    elif [ "${tokenValue}" == '-' ]; then
+      eval $tokenClassNM\=\"\$singleDashTokenClass\"
+    else
       # begins with a dash but isn't just a dash :: 'Option'
-      eval $tokenClassNM=\'Option\'
+      eval $tokenClassNM\=\'Option\'
     fi
   fi
-  return 0  
 }
 ###############################################################################
 ##
@@ -170,6 +185,69 @@ function OptionSplit () {
   eval $optionNameNM=\"\$name_np\"
   eval $optionValueNm=\"\$value_np\"
   return 0
+}
+###############################################################################
+##
+##  Purpose:
+##    Initialize map of option names that can be repeated on the command line.
+##
+##  Assumption:
+##    Since bash variable names are passed to this routine, these names
+##    cannot overlap the variable names locally declared within the
+##    scope of this routine or its descendants.
+##
+##  Input:
+##    $1 - Variable name referring to a bash map representing an
+##         an option repeat list.  The map associates the option name
+##         with its current repetition count.
+##    $2 - Variable name referring to a list of options that may 
+##         appear more than once on the command line.
+## 
+##  Output:
+##    $1 - Bash map now updated to reflect the options that can repeat with
+##         current occurance count initialized to 0.
+##
+###############################################################################
+function OptionRepeatMapInit(){
+  local -r optionRepMap_ref="$1"
+  local -r optionRepList_ref="$2"
+  eval local \-r repLstMax\=\"\$\{\#$optionRepList_ref\[\@\]\}\"
+  for (( ix=0; ix < repLstMax; ix++ )); do
+    eval let $optionRepMap_ref\[\"\$\{$optionRepList_ref\[\$ix\]\}\"\]\=0
+  done
+}
+###############################################################################
+##
+##  Purpose:
+##    Determine if named option can be repeated.  If so, then format the option
+##    name: <optionName>=<repetitionCount>.  RepetitionCount starts at 0.
+##    given option named "-c" its first named occurrence would be '-c=0'
+##
+##  Assumption:
+##    Since bash variable names are passed to this routine, these names
+##    cannot overlap the variable names locally declared within the
+##    scope of this routine or its descendants.
+##
+##  Input:
+##    $1 - Variable name referring to a bash map representing an
+##         an option repeat list.  The map associates the option name
+##         with its current repetition count.
+##    $2 - Variable name referring to the option name, which includes 
+##         '-' and '--' prefixes and will be applied as a key for $1 
+## 
+##  Output:
+##    $1 - Bash map may be updated to reflect new repetition count.
+##    $2 - Option name, if it appears in the map, will be renamed
+##         to reflect its repetition instance.
+##
+###############################################################################
+function OptionRepeatCheck(){
+  local -r optionRepMap_ref="$1"
+  local -r optionName_ref="$2"
+  eval local \-r repeatTotal\=\"\$\{$optionRepMap_ref\[\"\$$optionName_ref\"\]\}\"
+  if [ -z "$repeatTotal" ]; then return; fi
+  eval let $optionRepMap_ref\[\"\$$optionName_ref\"\]\+\+
+  eval $optionName_ref=\"\$$optionName_ref\=\$\{repeatTotal\}\"
 }
 ###############################################################################
 ##
