@@ -72,7 +72,7 @@ function ArgumentsParse () {
       stateOptArg)
         if [ "$tokenClass" == 'Option' ]; then
           OptionSplit "$tokenValue" 'optionName' 'optionValue'
-          eval $optionRepeatCheckFun
+          $optionRepeatCheckFun
           eval $argumentMapNm\[\"\$optionName\"\]=\"\$optionValue\"
           eval $argumentListNm\[\$argumentListIx\]=\"\$optionName\"
           (( ++argumentListIx ))
@@ -89,7 +89,7 @@ function ArgumentsParse () {
       stateOption)
         if [ "$tokenClass" == 'Option' ]; then
           OptionSplit "$tokenValue" 'optionName' 'optionValue'
-          eval $optionRepeatCheckFun
+          $optionRepeatCheckFun
           eval $argumentMapNm\[\"\$optionName\"\]=\"\$optionValue\"
           eval $argumentListNm\[\$argumentListIx\]=\"\$optionName\"
           (( ++argumentListIx ))
@@ -178,13 +178,10 @@ function OptionSplit () {
   local -r tokenValue="$1"
   local -r optionNameNM="$2"
   local -r optionValueNm="$3"
-
   local -r name_np="${tokenValue%%=*}"
   local -r value_np="${tokenValue:${#name_np}+1}"
-
   eval $optionNameNM=\"\$name_np\"
   eval $optionValueNm=\"\$value_np\"
-  return 0
 }
 ###############################################################################
 ##
@@ -205,7 +202,7 @@ function OptionSplit () {
 ## 
 ##  Output:
 ##    $1 - Bash map now updated to reflect the options that can repeat with
-##         current occurance count initialized to 0.
+##         current occurrence count initialized to 1.
 ##
 ###############################################################################
 function OptionRepeatMapInit(){
@@ -213,15 +210,15 @@ function OptionRepeatMapInit(){
   local -r optionRepList_ref="$2"
   eval local \-r repLstMax\=\"\$\{\#$optionRepList_ref\[\@\]\}\"
   for (( ix=0; ix < repLstMax; ix++ )); do
-    eval let $optionRepMap_ref\[\"\$\{$optionRepList_ref\[\$ix\]\}\"\]\=0
+    eval let $optionRepMap_ref\[\"\$\{$optionRepList_ref\[\$ix\]\}\"\]\=1
   done
 }
 ###############################################################################
 ##
 ##  Purpose:
 ##    Determine if named option can be repeated.  If so, then format the option
-##    name: <optionName>=<repetitionCount>.  RepetitionCount starts at 0.
-##    given option named "-c" its first named occurrence would be '-c=0'
+##    name: <optionName>=<repetitionCount>.  RepetitionCount starts at 1.
+##    given option named "-c" its first named occurrence would be '-c=1'
 ##
 ##  Assumption:
 ##    Since bash variable names are passed to this routine, these names
@@ -248,44 +245,6 @@ function OptionRepeatCheck(){
   if [ -z "$repeatTotal" ]; then return; fi
   eval let $optionRepMap_ref\[\"\$$optionName_ref\"\]\+\+
   eval $optionName_ref=\"\$$optionName_ref\=\$\{repeatTotal\}\"
-}
-###############################################################################
-##
-##  Purpose:
-##    Examines the provided options and arguments to ensure that required 
-##    ones are supplied and their values are acceptable.
-##
-##  Assumption:
-##    Since bash variable names are passed to this routine, these names
-##    cannot overlap the variable names locally declared within the
-##    scope of this routine or its decendents.
-##
-##  Inputs:
-##    $1 - Callback function name:  Callback load a table that defines
-##         the valid options/arguments for a command and other traits too.
-##    $2 - Array detailing provided options and arguments to be
-##    $3 - An associative array of option and argument values.
-## 
-##  Outputs:
-##    When Failure: 
-##      SYSERR - A message indicating reason for an error.
-##
-###############################################################################
-function OptionsArgsVerify () {
-  local callbackFunctionName="$1"
-  local optArgListNm="$2"
-  local optArgMapNm="$3"
-  local errorInd=false
-  if ! OptionsArgsRequireVerify "$callbackFunctionName" "$optArgListNm" "$optArgMapNm"; then errorInd=true; fi
-  local -a optArg_dlw_List
-  local -A optArg_dlw_Map
-  OptionsArgsOnly_dlw "$optArgListNm" "$optArgMapNm" 'optArg_dlw_List' 'optArg_dlw_Map'
-  if ! OptionsArgsValueVerify "$callbackFunctionName" 'optArg_dlw_List' 'optArg_dlw_Map'; then errorInd=true; fi
-  if $errorInd; then return 1; fi
-# TODO: if ! OptionsArgsSetValues "$callbackFunctionName" "$optArgListNm" "$optArgMapNm"; then
-#    ScriptUnwind $LINENO "Unable to properly assign option/argument values for command: '$callbackFunctionName'."
-#  fi 
-  return 0
 }
 ###############################################################################
 ##
@@ -348,7 +307,6 @@ function OptionsArgsFilter () {
     eval $optArgListMmNew\+\=\(\"\$optArg\"\)
     eval $optArgMapNmNew\[\"\$optArg\"\]\=\$\{$optArgMapNm\[\"\$optArg\"\]\}
   done
-  return 0
 }
 ###############################################################################
 ##
@@ -374,15 +332,14 @@ function OptionsArgsFilter () {
 ##
 ###############################################################################
 function OptionsArgsVerify () {
-  local callbackFunctionName="$1"
-  local optArgListNm="$2"
-  local optArgMapNm="$3"
-  local errorInd=false
-  if ! OptionsArgsAliasNormalize "$callbackFunctionName" "$optArgListNm" "$optArgMapNm"; then errorInd=true; fi
-  if ! OptionsArgsRequireVerify  "$callbackFunctionName" "$optArgListNm" "$optArgMapNm"; then errorInd=true; fi
-  if ! OptionsArgsValueVerify    "$callbackFunctionName" "$optArgListNm" "$optArgMapNm"; then errorInd=true; fi
-  if $errorInd; then return 1; fi
-  return 0
+  local -r callbackFunctionName="$1"
+  local -r optArgListNm="$2"
+  local -r optArgMapNm="$3"
+  local successInd='true'
+  if ! OptionsArgsAliasNormalize "$callbackFunctionName" "$optArgListNm" "$optArgMapNm"; then successInd='false'; fi
+  if ! OptionsArgsRequireVerify  "$callbackFunctionName" "$optArgListNm" "$optArgMapNm"; then successInd='false'; fi
+  if ! OptionsArgsValueVerify    "$callbackFunctionName" "$optArgListNm" "$optArgMapNm"; then successInd='false'; fi
+  $successInd;
 }
 ###############################################################################
 ##
@@ -408,11 +365,6 @@ function OptionsArgsVerify () {
 ##  Outputs:
 ##    When Success: 
 ##      All aliased options are converted to the given normalized names.
-##      
-##      this routine added the required ones that were defined with
-##      default values.
-##    When Failure: 
-##      SYSOUT - A message listing the missing parameters.
 ##
 ###############################################################################
 function OptionsArgsAliasNormalize () {
@@ -517,7 +469,7 @@ function OptionsArgsDefNormMap () {
 ##  Assumption:
 ##    Since bash variable names are passed to this routine, these names
 ##    cannot overlap the variable names locally declared within the
-##    scope of this routine or its decendents.
+##    scope of this routine or its descendants.
 ##
 ##  Inputs:
 ##    $1 - Callback function name.  This function must stream 
@@ -535,9 +487,9 @@ function OptionsArgsDefNormMap () {
 ##
 ###############################################################################
 function OptionsArgsRequireVerify () {
-  local callbackFunctionName="$1"
-  local optArgListNm="$2"
-  local optArgMapNm="$3"
+  local -r callbackFunctionName="$1"
+  local -r optArgListNm="$2"
+  local -r optArgMapNm="$3"
   local -A argOpt_optArgName
   local -A argOpt_default
   local -A argOpt_presence
@@ -581,7 +533,6 @@ function OptionsArgsRequireVerify () {
     fi
   done
   if $errorInd; then OptionsArgsMessageErrorIssue "Required opt/arg absent or no default value: $requiredMissing"; return 1; fi
-  return 0;
 }
 ###############################################################################
 ##
@@ -601,12 +552,12 @@ function OptionsArgsRequireVerify () {
 ##         routine.   
 ##    $4 - A string specifying the desired traits to retrieve.  The string
 ##         contains a trait's column name delimited by a space that both
-##         preceeds and succeeds it.
+##         precedes and succeeds it.
 ## 
 ## 
 ##  Outputs:
 ##    When Failure: 
-##      Either it sliently fails or writes an error message to $3.
+##      Either it silently fails or writes an error message to $3.
 ##    When Success:
 ##      A series of associative arrays prefixed by the the provided "table name"
 ##      containing the traits of all the options/arguments specified for
@@ -654,7 +605,7 @@ function OptionsArgsDefTbl () {
 ##  Assumption:
 ##    Since bash variable names are passed to this routine, these names
 ##    cannot overlap the variable names locally declared within the
-##    scope of this routine or its decendents.
+##    scope of this routine or its descendants.
 ##
 ##  Inputs:
 ##    $1 - Callback function name:  Callback load a table that defines
@@ -689,8 +640,10 @@ function OptionsArgsValueVerify () {
     local optArgVerifyFunIx
     if [ "${argOpt_optArgName["$optArg"]}" == "$optArg" ]; then
       optArgVerifyFunIx="$optArg"
-    elif [[ "$optArg" =~ Arg[1-9][0-9]* ]] && [ "${argOpt_optArgName['ArgN']}" == 'ArgN' ]; then
+    elif [[ "$optArg" =~ ^Arg[1-9][0-9]*$ ]] && [ "${argOpt_optArgName['ArgN']}" == 'ArgN' ]; then
       optArgVerifyFunIx='ArgN'
+    elif [[ "$optArg" =~ ^(-[^=]+=)[1-9][0-9]*$ ]] && [ "${argOpt_optArgName["${BASH_REMATCH[1]}N"]}" == "${BASH_REMATCH[1]}N" ]; then
+      optArgVerifyFunIx="${BASH_REMATCH[1]}N"
     else
       if ! [ "${argOpt_optArgName['--Ignore-Unknown-OptArgs']}" == '--Ignore-Unknown-OptArgs' ]; then
         argArgValueInvalid+="Unknown OptArg: '$optArg', value: '$optArgValue' "
@@ -746,7 +699,6 @@ function OptionsArgsBooleanVerify () {
 ###############################################################################
 function OptionsArgsMessageErrorIssue () {
   echo "$1">&2
-  return 1;
 }
 ##############################################################################
 ##
@@ -795,7 +747,6 @@ function OptionsArgsRemove () {
     eval local optArgValue=\"\$\{$optArgMapNm\[\"\$optArg\"\]\}\"
     if [ -n "$optArgValue" ]; then eval $optArgMapNmOutput\[\"\$optArg\"\]\=\"\$optArgValue\"; fi
   done
-  return 0;
 }
 ##############################################################################
 ##
@@ -838,10 +789,15 @@ function OptionsArgsGen () {
     eval local value=\"\$\{$optArgMapNm\[\"\$optArg\"\]\}\"
     value=${value//\'/\'\"\'\"\'}
     value="'${value}'"
-    if [[ "$optArg" =~ ^Arg[0-9][0-9]*$ ]]; then
+    if [[ "$optArg" =~ ^Arg[1-9][0-9]*$ ]]; then
       argOutBuf="$argOutBuf $value";
     else
-      optOutBuf="$optOutBuf $optArg"
+      if [[ "$optArg" =~ ^(-[^=]+)=[1-9][0-9]*$ ]]; then
+        # handle repeatable options
+        optOutBuf="$optOutBuf ${BASH_REMATCH[1]}"
+      else
+        optOutBuf="$optOutBuf $optArg"
+      fi
       if [ "$value" != "''" ]; then
         optOutBuf="$optOutBuf $value"
       fi
@@ -853,12 +809,11 @@ function OptionsArgsGen () {
   # be recognized.
   if [ -n "$argOutBuf" ]; then optOutBuf="$optOutBuf -- $argOutBuf"; fi
   echo "$optOutBuf"
-  return 0
 }
 ##############################################################################
 ##
 ##  Purpose:
-##    By pass the given command's general description and extract the option
+##    Bypass the given command's general description and extract the option
 ##    settings that begin with the first '-'.  Also, write a header and the
 ##    extracted options to SYSOUT.
 ##
