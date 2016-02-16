@@ -7,7 +7,6 @@ ref_simple_value_Set(){
 }
 #TODO: Add Digest support.
 #TODO: remove ScriptDebug messages.
-#TODO: Support docker -c option to permit specifying commands
 #TODO: support import as a mechanism --upc-import
 #TODO: convert to more standard oo implementation
 ##############################################################################
@@ -16,6 +15,13 @@ ref_simple_value_Set(){
 ##    see VirtCmmdInterface.sh -> VirtCmmdConfigSetDefault
 ##
 ###############################################################################
+function VirtCmmdArgumentsParse () {
+  local -a ucpOptRepeatList=( '--change' )
+  ucpOptRepeatList+=( '-c' )
+
+  ArgumentsParse "$1" "$2" "$3" 'ucpOptRepeatList'
+}
+
 VirtCmmdConfigSetDefault () {
   REG_EX_UUID='^[a-fA-F0-9]+'
   REG_EX_REPOSITORY_NAME_UUID='^([a-z0-9]([._-]?[a-z0-9]+)*/)*[a-z0-9]([._-]?[a-z0-9]+)*(:[A-Za-z0-9._-]*)?'
@@ -51,8 +57,12 @@ Usage: ${BASH_SOURCE[4]} [OPTIONS] SOURCE [SOURCE]... TARGET
 
 OPTIONS:
     --ucpchk-reg=false        Don't pull images from registry. Limits image name
-                              resolution to Docker local repository. 
-                              concurrently to both SOURCE and TARGET.
+                                resolution to Docker local repository. 
+                                concurrently to both SOURCE and TARGET.
+    --author="",-a            Specify maintainer when target is an image.
+    --change[],-c             Apply specified Dockerfile instruction(s) when
+                                target is an image. see 'docker commit'
+    --message="",-m           Apply commit message when target is an image.
     --help=false,-h           Don't display this help message.
     --version=false           Don't display version info.
                                
@@ -86,6 +96,10 @@ cat <<OPTIONARGS
 Arg1           single ''                "arg_type_format_Verify   '\\<Arg1\\>' "        required
 Arg2           single '-'               "arg_type_format_Verify   '\\<Arg2\\>' "        required
 ArgN           single ''                "arg_type_format_Verify   '\\<ArgN\\>' "        optional
+--author       single ''                ''                                              optional '-a'
+--change=N     single ''                ''                                              optional
+-c=N           single ''                ''                                              optional
+--message      single ''                ''                                              optional '-m'
 --ucpchk-reg   single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--ucpchk-reg\\>'" required
 --help         single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--help\\>'"       required "-h"
 --version      single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--version\\>'"    required
@@ -183,7 +197,7 @@ VirtCmmdExecute(){
     source_obj_Release 'argSourceObj'
   done
   # successfully completed copy operation commit changes to target.
-  target_obj_Commit  'argTargetObj'
+  target_obj_Commit  'argTargetObj' "$optArgLst_ref" "$optArgMap_ref"
   target_obj_Release 'argTargetObj'
 }
 ##############################################################################
@@ -519,6 +533,10 @@ target_type_interface(){
   ##  Inputs:
   ##    $1 - The name of a variable representing the associative map constructed
   ##         by the target_obj_Create method.
+  ##    $2 - The name of a variable representing the array of all options 
+  ##         and arguments names in the order encountered on the command line.
+  ##    $3 - The name of a variable representing an associative map of all
+  ##         option and argument values keyed by the option/argument names.
   ##
   ###############################################################################
   target_obj_Commit(){
@@ -777,10 +795,26 @@ target_type_imagefilepath(){
   }
   target_obj_Commit(){
     local -r targetObj_ref="$1"
+    local -r optArgList_ref="$2"
+    local -r optArgMap_ref="$3"
+    local -a dockerCommitOptList
+    local -A dockerCommitOptMap
+    AssociativeMapKeyValueEcho "$optArgMap_ref">&2
+    if ! OptionsArgsFilter "$optArgList_ref" "$optArgMap_ref" 'dockerCommitOptList' 'dockerCommitOptMap' '[[ $optArg =~ ^--change=[1-9][0-9]*$ ]] || [[ $optArg =~ ^-c=[1-9][0-9]*$ ]] || [ "$optArg" == "--author" ] || [ "$optArg" == "--message" ]' 'true'; then
+      ScriptUnwind "$LINENO" "Problem filtering options for docker commit."
+    fi
+    AssociativeMapKeyValueEcho 'dockerCommitOptMap'>&2
+    local dockerCommitOpt=''
+    if (( ${#dockerCommitOptList[@]} > 0 )); then
+      if ! dockerCommitOpt="$( OptionsArgsGen 'dockerCommitOptList' 'dockerCommitOptMap' )"; then
+        ScriptUnwind "$LINENO" "Problem generating options for docker commit."
+      fi
+    fi
+    local -r dockerCommitOpt
     eval local \-r targetContainer\=\"\$\{$targetObj_ref\[targetContainer\]\}\"
     eval local \-r entryPtCurrent\=\"\$\{$targetObj_ref\[entryPtCurrent\]\}\"
     eval local \-r imageName\=\"\$\{$targetObj_ref\[imageName\]\}\"
-    eval docker commit $entryptNullify \$targetContainer \$imageName
+    eval docker commit $entryptNullify $dockerCommitOpt \$targetContainer \$imageName
   }
   target_obj_arg_PermitsMultiSource(){
     local -r this_ref="$1"
