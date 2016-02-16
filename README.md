@@ -1,6 +1,6 @@
 # dkrcp
-Copy files between host's file system, containers and images.
-````
+Copy files between host's file system, containers, and images.
+```
 Usage: ./dkrcp.sh [OPTIONS] SOURCE [SOURCE]... TARGET 
 
   SOURCE - Can be either: 
@@ -24,4 +24,13 @@ OPTIONS:
     --message="",-m           Apply commit message when target is an image.
     --help=false,-h           Don't display this help message.
     --version=false           Don't display version info.
-````
+```
+
+Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandline/cp/) by:
+  * Facilitating image creation/adaptation by simply copying files to either a newly specified image name or an existing one.  When copying to an existing image, its layers are unaffected as copy preserves its immutability by creating a new layer.
+  * Enabling the specification of mutiple copy sources, including other images, improving operational alignment with the linux [```cp -a```](https://en.wikipedia.org/wiki/Cp_%28Unix%29).
+
+# Why?
+  * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
+  * Facilitates manufacturing images using construction piplines that potentially eliminate the need for Dockerfiles.
+  * Encapsulates the necessary implementation of several docker CLI calls elmiminating the redundant encoding 
