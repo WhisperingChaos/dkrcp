@@ -307,16 +307,14 @@ function AssociativeMapKeyExist () {
   done
   return 1; 
 }
-function AssociativeMapKeyValueEcho () {
+function AssociativeMapKeyValueEcho(){
   local associativeMapToTest="$1"
-  eval mapKeyList=\"\$\{\!$associativeMapToTest\[\@\]\}\"
-  local key
-  for key in $mapKeyList
-  do
-     eval local value\=\"\$\{$associativeMapToTest\[\"\$key\"\]\}\"
-     echo "key='$key', value='$value'"
+  eval set -- \"\$\{\!$associativeMapToTest\[\@\]\}\"
+  while (( ${#} > 0 )); do
+     eval local value\=\"\$\{$associativeMapToTest\[\"\$1\"\]\}\"
+     echo "key='$1', value='$value'"
+     shift
   done
-  return 0; 
 }
 ###############################################################################
 ##
