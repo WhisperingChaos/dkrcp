@@ -29,7 +29,14 @@ OPTIONS:
 Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandline/cp/) by:
   * Facilitating image creation/adaptation by simply copying files to either a newly specified image or an existing one.  When copying to an existing image, its state is unaffected as copy preserves its immutability by creating a new layer.
   * Enabling the specification of mutiple copy sources, including other images, to improve operational alignment with linux [```cp -a```](https://en.wikipedia.org/wiki/Cp_%28Unix%29) and minimize layer creation when TARGET refers to an image.
+ 
+#### Copy Semantics
+Since ```dkrcp``` relies on ```docker cp``` its copy documentation describes the expected behavior of ```dkrcp``` when specifying only a single SOURCE argument.  However, the following table derived while designing dkrcp may present the semantics more clearly than the documention associated to ```docker cp```.
 
+|         | Source File  | Source Directory | Source Directory Content | Stream |
+| :--:    | :----------: | :---------------:| :---------------: | :-------: |
+|Target exists as file. | Overlay Target with Source content. | Error |Error | Error |
+|Target leaf does not exist but its parent directory does.| Leaf assumed a file. Copy Source contents to leaf name.| Leaf assumed directory. Create Target Directory with leaf name and copy Source "content" to it. | Identical behavior to adjacent left hand cell. | Error | 
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
   * Facilitates manufacturing images by construction piplines that gradually evolve either toward or away from their reliance on Dockerfiles.
