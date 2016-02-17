@@ -27,10 +27,10 @@ OPTIONS:
 ```
 
 Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandline/cp/) by:
-  * Facilitating image creation/adaptation by simply copying files to either a newly specified image name or an existing one.  When copying to an existing image, its layers are unaffected as copy preserves its immutability by creating a new layer.
-  * Enabling the specification of mutiple copy sources, including other images, improving operational alignment with the linux [```cp -a```](https://en.wikipedia.org/wiki/Cp_%28Unix%29) and minimizing layer creation when TARGET refers to an image.
+  * Facilitating image creation/adaptation by simply copying files to either a newly specified image or an existing one.  When copying to an existing image, its state is unaffected as copy preserves its immutability by creating a new layer.
+  * Enabling the specification of mutiple copy sources, including other images, to improve operational alignment with linux [```cp -a```](https://en.wikipedia.org/wiki/Cp_%28Unix%29) and minimize layer creation when TARGET refers to an image.
 
-## Why?
+#### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
-  * Facilitates manufacturing images using construction piplines that potentially eliminate the need for Dockerfiles.
-  * Encapsulates the necessary implementation of several docker CLI calls elmiminating the redundant encoding 
+  * Facilitates manufacturing images by construction piplines that gradually evolve either toward or away from their reliance on Dockerfiles.
+  * Encapsulates the reliance on and encoding of several Docker CLI calls to implement the desired functionality insulating automation incorporating this utility from potentially future improved support by Docker community members through dkrcp's interface.
