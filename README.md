@@ -33,13 +33,13 @@ Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandli
 #### Copy Semantics
 Since ```dkrcp``` relies on ```docker cp``` its [documentation](https://docs.docker.com/engine/reference/commandline/cp/) describes the expected behavior of ```dkrcp``` when specifying a single SOURCE argument.  However, the following table, formulated while designing dkrcp may present the semantics more clearly than the documention associated to ```docker cp```.
 
-|         | SOURCE File  | SOURCE Directory | [SOURCE Directory Content](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#source-directory-content-an-existing-directory-path-appended-by-) | Stream |
+|         | SOURCE File  | SOURCE Directory | [SOURCE Directory Content](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#source-directory-content-an-existing-directory-path-appended-with-) | SOURCE Stream |
 | :--:    | :----------: | :---------------:| :---------------: | :-------: |
 | **TARGET exists as file.** | Overlay TARGET with SOURCE content. | Error |Error | Error |
 | **TARGET name does not exist but its parent directory does.** | File name assumed. Copy SOURCE contents to name.| Directory name assumed. Create TARGET Directory with name and copy SOURCE "content" to it. | Identical behavior to adjacent left hand cell. | Error |
 | **TARGET name does not exist, nor does its parent directory.** | Error | Error | Error | Error|
 | **TARGET exists as directory.** | Copied to TARGET. | Copied to TARGET. | SOURCE content copied to TARGET. | File/Directory copied to TARGET. |
-| **[TARGET assumed directory](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#TARGET-assumed-directory-the-rightmost-last-name-of-a-specified-path-suffixed-by---it-is-assumed-to-reference-an-existing-directory) but doesn't exist.** | Error | Error | Error | Error |
+| **[TARGET assumed directory](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#target-assumed-directory-the-rightmost-last-name-of-a-specified-path-suffixed-by---it-is-assumed-to-reference-an-existing-directory) but doesn't exist.** | Error | Error | Error | Error |
 
 ######TARGET assumed directory: The rightmost, last, name of a specified [path](https://en.wikipedia.org/wiki/Path_%28computing%29) suffixed by '/'.  It is assumed to reference an existing directory.
 
