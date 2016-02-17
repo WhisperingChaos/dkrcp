@@ -48,5 +48,5 @@ Since ```dkrcp``` relies on ```docker cp``` its [documentation](https://docs.doc
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
     * Although special effort has been applied to minimize the size of Official Docker Hub images by removing unnecessary resources, the inability to separate build time produced artifacts and their required dependencies continues to pollute the runtime image with unnecessary builtime only artifacts.  
-  * Facilitates manufacturing images by construction piplines that gradually evolve either toward or away from their reliance on Dockerfiles.
+  * Facilitates manufacturing images by piplines that gradually evolve either toward or away from their reliance on Dockerfiles.
   * Encapsulates the reliance on and encoding of several Docker CLI calls to implement the desired functionality insulating automation incorporating this utility from potentially future improved support by Docker community members through dkrcp's interface.
