@@ -31,15 +31,22 @@ Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandli
   * Enabling the specification of mutiple copy sources, including other images, to improve operational alignment with linux [```cp -a```](https://en.wikipedia.org/wiki/Cp_%28Unix%29) and minimize layer creation when TARGET refers to an image.
  
 #### Copy Semantics
-Since ```dkrcp``` relies on ```docker cp``` its copy documentation describes the expected behavior of ```dkrcp``` when specifying only a single SOURCE argument.  However, the following table derived while designing dkrcp may present the semantics more clearly than the documention associated to ```docker cp```.
+Since ```dkrcp``` relies on ```docker cp``` its [documentation](https://docs.docker.com/engine/reference/commandline/cp/) describes the expected behavior of ```dkrcp``` when specifying a single SOURCE argument.  However, the following table, formulated while designing dkrcp may present the semantics more clearly than the documention associated to ```docker cp```.
 
 |         | Source File  | Source Directory | Source Directory Content | Stream |
 | :--:    | :----------: | :---------------:| :---------------: | :-------: |
-| Target exists as file. | Overlay Target with Source content. | Error |Error | Error |
-| Target leaf does not exist but its parent directory does.| Leaf assumed a file. Copy Source contents to leaf name.| Leaf assumed directory. Create Target Directory with leaf name and copy Source "content" to it. | Identical behavior to adjacent left hand cell. | Error |
-| Target leaf does not exist, nor does its parent. | Error | Error | Error | Error|
-| Target exists as directory. | Copied to Target. | Copied to Target. | Source content copied to Target. | File/Directory copied to Target. |
-| Target assumed directory but doesn't exist. | Error | Error | Error | Error |
+| **Target exists as file.** | Overlay Target with Source content. | Error |Error | Error |
+| **Target leaf does not exist but its parent directory does.** | Leaf assumed a file. Copy Source contents to leaf name.| Leaf assumed directory. Create Target Directory with leaf name and copy Source "content" to it. | Identical behavior to adjacent left hand cell. | Error |
+| **Target leaf does not exist, nor does its parent.** | Error | Error | Error | Error|
+| **Target exists as directory.** | Copied to Target. | Copied to Target. | Source content copied to Target. | File/Directory copied to Target. |
+| **Target assumed directory but doesn't exist.** | Error | Error | Error | Error |
+
+######leaf: The rightmost, last, name in a [path](https://en.wikipedia.org/wiki/Path_%28computing%29).
+
+######Target assumed directory: A leaf suffixed by '/'.  It is assumed to reference an existing directory.
+
+######Source Directory Content
+
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
   * Facilitates manufacturing images by construction piplines that gradually evolve either toward or away from their reliance on Dockerfiles.
