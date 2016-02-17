@@ -33,7 +33,7 @@ Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandli
 #### Copy Semantics
 Since ```dkrcp``` relies on ```docker cp``` its [documentation](https://docs.docker.com/engine/reference/commandline/cp/) describes the expected behavior of ```dkrcp``` when specifying a single SOURCE argument.  However, the following table, formulated while designing dkrcp may present the semantics more clearly than the documention associated to ```docker cp```.
 
-|         | Source File  | Source Directory | Source Directory Content | Stream |
+|         | Source File  | Source Directory | [Source Directory Content](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#source-directory-content-an-existing-directory-path-appended-by-) | Stream |
 | :--:    | :----------: | :---------------:| :---------------: | :-------: |
 | **Target exists as file.** | Overlay Target with Source content. | Error |Error | Error |
 | **Target name does not exist but its parent directory does.** | Name assumed a file. Copy Source contents to name.| Name assumed directory. Create Target Directory with name and copy Source "content" to it. | Identical behavior to adjacent left hand cell. | Error |
