@@ -36,16 +36,14 @@ Since ```dkrcp``` relies on ```docker cp``` its [documentation](https://docs.doc
 |         | Source File  | Source Directory | Source Directory Content | Stream |
 | :--:    | :----------: | :---------------:| :---------------: | :-------: |
 | **Target exists as file.** | Overlay Target with Source content. | Error |Error | Error |
-| **Target leaf does not exist but its parent directory does.** | Leaf assumed a file. Copy Source contents to leaf name.| Leaf assumed directory. Create Target Directory with leaf name and copy Source "content" to it. | Identical behavior to adjacent left hand cell. | Error |
-| **Target leaf does not exist, nor does its parent.** | Error | Error | Error | Error|
+| **Target name does not exist but its parent directory does.** | Name assumed a file. Copy Source contents to name.| Name assumed directory. Create Target Directory with name and copy Source "content" to it. | Identical behavior to adjacent left hand cell. | Error |
+| **Target name does not exist, nor does its parent directory.** | Error | Error | Error | Error|
 | **Target exists as directory.** | Copied to Target. | Copied to Target. | Source content copied to Target. | File/Directory copied to Target. |
 | **Target assumed directory but doesn't exist.** | Error | Error | Error | Error |
 
-######leaf: The rightmost, last, name in a [path](https://en.wikipedia.org/wiki/Path_%28computing%29).
+######Target assumed directory: The rightmost, last, name of a specified [path](https://en.wikipedia.org/wiki/Path_%28computing%29) suffixed by '/'.  It is assumed to reference an existing directory.
 
-######Target assumed directory: A leaf suffixed by '/'.  It is assumed to reference an existing directory.
-
-######Source Directory Content
+######Source Directory Content: An existing directory path appended by '/.' 
 
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
