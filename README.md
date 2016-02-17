@@ -35,8 +35,11 @@ Since ```dkrcp``` relies on ```docker cp``` its copy documentation describes the
 
 |         | Source File  | Source Directory | Source Directory Content | Stream |
 | :--:    | :----------: | :---------------:| :---------------: | :-------: |
-|Target exists as file. | Overlay Target with Source content. | Error |Error | Error |
-|Target leaf does not exist but its parent directory does.| Leaf assumed a file. Copy Source contents to leaf name.| Leaf assumed directory. Create Target Directory with leaf name and copy Source "content" to it. | Identical behavior to adjacent left hand cell. | Error | 
+| Target exists as file. | Overlay Target with Source content. | Error |Error | Error |
+| Target leaf does not exist but its parent directory does.| Leaf assumed a file. Copy Source contents to leaf name.| Leaf assumed directory. Create Target Directory with leaf name and copy Source "content" to it. | Identical behavior to adjacent left hand cell. | Error |
+| Target leaf does not exist, nor does its parent. | Error | Error | Error | Error|
+| Target exists as directory. | Copied to Target. | Copied to Target. | Source content copied to Target. | File/Directory copied to Target. |
+| Target assumed directory but doesn't exist. | Error | Error | Error | Error |
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
   * Facilitates manufacturing images by construction piplines that gradually evolve either toward or away from their reliance on Dockerfiles.
