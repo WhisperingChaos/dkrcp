@@ -2,6 +2,7 @@ source "MessageInclude.sh";
 source "ArgumentsGetInclude.sh";
 source "ArrayMapTestInclude.sh";
 source "VirtCmmdInterface.sh";
+#TODO: locate an include file providing frequently needed functions.
 ref_simple_value_Set(){
   eval $1=\"\$2\"
 }
@@ -14,12 +15,16 @@ ref_simple_value_Set(){
 ##  Purpose:
 ##    see VirtCmmdInterface.sh -> VirtCmmdConfigSetDefault
 ##
+##    Override usual implementation to define repeatable options, like --change,
+##    and reclassify a solitary dash, ' - ', specified on the command line
+##    as an argument and not, as is typically the case, delimiting the start
+##    of the command's arguments (synonym for ' -- ').
+##
 ###############################################################################
 function VirtCmmdArgumentsParse () {
   local -a ucpOptRepeatList=( '--change' )
   ucpOptRepeatList+=( '-c' )
-
-  ArgumentsParse "$1" "$2" "$3" 'ucpOptRepeatList'
+  ArgumentsParse "$1" "$2" "$3" 'ucpOptRepeatList' 'Argument'
 }
 
 VirtCmmdConfigSetDefault () {
@@ -57,15 +62,17 @@ Usage: ${BASH_SOURCE[4]} [OPTIONS] SOURCE [SOURCE]... TARGET
 
 OPTIONS:
     --ucpchk-reg=false        Don't pull images from registry. Limits image name
-                                resolution to Docker local repository. 
-                                concurrently to both SOURCE and TARGET.
+                                resolution to Docker local repository for  
+                                both SOURCE and TARGET names.
     --author="",-a            Specify maintainer when target is an image.
     --change[],-c             Apply specified Dockerfile instruction(s) when
                                 target is an image. see 'docker commit'
     --message="",-m           Apply commit message when target is an image.
     --help=false,-h           Don't display this help message.
     --version=false           Don't display version info.
-                               
+
+For more help: https://github.com/WhisperingChaos/dkrcp
+
 HELP_DOC
 }
 ##############################################################################
@@ -79,7 +86,7 @@ cat <<VERSION_DOC
 
 Version : 0.5
 Requires: bash 4.2+, Docker Client 1.8+
-Issues  : 
+Issues  : https://github.com/WhisperingChaos/dkrcp/issues
 License : The MIT License (MIT) Copyright (c) 2014-2016 Richard Moyse License@Moyse.US
 
 VERSION_DOC
