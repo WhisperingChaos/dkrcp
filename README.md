@@ -43,7 +43,7 @@ Since ```dkrcp``` relies on ```docker cp``` its [documentation](https://docs.doc
 
 ######Target assumed directory: The rightmost, last, name of a specified [path](https://en.wikipedia.org/wiki/Path_%28computing%29) suffixed by '/'.  It is assumed to reference an existing directory.
 
-######Source Directory Content: An existing directory path appended by '/.' 
+######Source Directory Content: An existing directory path appended with '/.' 
 
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
