@@ -39,7 +39,7 @@ Since ```dkrcp``` relies on ```docker cp``` its [documentation](https://docs.doc
 | **Target name does not exist but its parent directory does.** | Name assumed a file. Copy Source contents to name.| Name assumed directory. Create Target Directory with name and copy Source "content" to it. | Identical behavior to adjacent left hand cell. | Error |
 | **Target name does not exist, nor does its parent directory.** | Error | Error | Error | Error|
 | **Target exists as directory.** | Copied to Target. | Copied to Target. | Source content copied to Target. | File/Directory copied to Target. |
-| **Target assumed directory but doesn't exist.** | Error | Error | Error | Error |
+| **[Target assumed directory](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#target-assumed-directory-the-rightmost-last-name-of-a-specified-path-suffixed-by---it-is-assumed-to-reference-an-existing-directory) but doesn't exist.** | Error | Error | Error | Error |
 
 ######Target assumed directory: The rightmost, last, name of a specified [path](https://en.wikipedia.org/wiki/Path_%28computing%29) suffixed by '/'.  It is assumed to reference an existing directory.
 
