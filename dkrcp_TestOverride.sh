@@ -1033,25 +1033,45 @@ test_element_interface(){
   ##
   ##  Purpose:
   ##    Categorizes the arguments for a test element as either being one
-  ##    or more dkrcp source argument(s) or a target one.  Source arguments
-  ##    names are maintained in an array called testSourceArgList while 
-  ##    the variable named testTargetArg_ref stores the target argument's name.
+  ##    or more dkrcp source argument(s), a target one. or a variable that these
+  ##    (source/target) arguments depend on.  Source arguments
+  ##    names are maintained in an array called testSourceArgList, the target 
+  ##    argument is maintained in a variable named testTargetArg_ref, while
+  ##    testDependArgList array manages all the other variables.
   ##
   ##  Inputs:
   ##    testSourceArgList - defined by function that calls this one.
-  ##    testTargetArg_ref - defined by function that calls this one.
+  ##    testTargetArg_ref -           ""
+  ##    testDependArgList -           "" 
   ##
   ##  Outputs:
   ##    testSourceArgList - updated to reflect list of source
   ##        dkrcp argument object names.
   ##    testTargetArg_ref - update to reflect the dkrcp target
   ##        argument name.
+  ##    testDependArgList - updated to reflect variables needed to define
+  ##        testSourceArgList & testTargetArg_ref.
   ##
   ###############################################################################
   test_element_args_Catgry(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
   }
-
+  ###############################################################################
+  ##
+  ##  Purpose:
+  ##    Defines dkrcp command line options to include when its executed.
+  ##
+  ##  Inputs:
+  ##    $1  -  Variable name to receive a string of space separated options.
+  ##
+  ##  Outputs:
+  ##    $1  -  Updated to reflect a string of zero or more options.
+  ##
+  ###############################################################################
+  test_element_cmd_options_Get(){
+    # default implementation does not produce any options.
+    ref_simple_value_Set "$1" ''
+  } 
 }
 ###############################################################################
 ##
@@ -1241,11 +1261,14 @@ test_element_impl(){
       local -r dkrcpSourcArgs
       _test_element_arg_source_Iter _dkrcp_source_args_Prequel_Gen
       local -r dkrcpPrequelCmdStream
+      local dkrcpCmdOptions
+      test_element_cmd_options_Get 'dkrcpCmdOptions'
+      local -r dkrcpCmdOptions
       reflect_type_Active "$testTargetArg_ref"
       local dkrcpTargetArg
       dkrcp_arg_Get "$testTargetArg_ref" 'dkrcpTargetArg' 
       local -r dkrcpTargetArg
-      eval "$dkrcpPrequelCmdStream" | eval dkrcp.sh "$dkrcpSourcArgs" "$dkrcpTargetArg" \2\>\&1 | dkrcp_arg_output_Inspect "$testTargetArg_ref"
+      eval "$dkrcpPrequelCmdStream" | eval dkrcp.sh $dkrcpCmdOptions "$dkrcpSourcArgs" "$dkrcpTargetArg" \2\>\&1 | dkrcp_arg_output_Inspect "$testTargetArg_ref"
       local -r dkrcpRunStatus="${PIPESTATUS[@]}"
       if ! [[ $dkrcpRunStatus =~ ^0.[0-9]+.0 ]]; then
         # output inspection detected an unexpected problem terminate testing
@@ -1340,7 +1363,6 @@ test_element_impl(){
       _test_element_model_expected_Create
       _test_element_model_result_Create
       _test_element_models_Compare
-      # sleep 30
     fi
   }
 }
@@ -2010,5 +2032,40 @@ dkrcp_test_20(){
          "image into it. The target directory exists and is terminated by / ." \
          " Outcome: New image created with target directory containing"        \
          "the source image's directory."
+  }
+}
+###############################################################################
+dkrcp_test_21(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_a'    'd' 'dir_a'     'file_content_dir_create'  "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_a'  'f' 'dir_a/a'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_b'  'f' 'dir_a/b'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_c'  'f' 'dir_a/c'   'file_content_reflect_name' "
+      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTest'     'd' 'dir_a'     'false' 'test_21:tagit' "
+      echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=(  'hostFile_dir_a' )
+      testDependArgList=(  'hostFile_dir_a_a' )
+      testDependArgList+=( 'hostFile_dir_a_b' )
+      testDependArgList+=( 'hostFile_dir_a_c' )
+      testTargetArg_ref='imageNameTest'
+    }
+    test_element_cmd_options_Get(){
+      local options="--change 'EXPOSE 6767' --change 'ENV envVar=value' --change 'LABEL test_21_label=label_value'"
+      options+=" --change 'USER test_21_user' --change 'ENTRYPOINT [\"executable\", \"parm1\"]'"
+      options+=" --message 'message for test_21' --author 'author for test_21'"
+      ref_simple_value_Set "$1" "$options"
+    }
+  }
+  test_element_test_1_imp
+  dkrcp_test_Desc(){
+    echo "Create an image by copying a directory to its root directory."          \
+         "Specify all docker commit variables and ensure these variables are"     \
+         "set to these values.  Outcome: Image should exist with the appropriate" \
+         "docker commit option values created in its metadata"
   }
 }
