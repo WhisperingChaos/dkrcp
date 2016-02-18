@@ -250,8 +250,9 @@ function OptionRepeatCheck(){
 ##
 ##  Purpose:
 ##    Given an array and corresponding map of options and arguments, 
-##    produce an array and map that are reflective of only dlw
-##    options/arguments and their values.
+##    produce a result array and map that are reflective of only the
+##    options/arguments and their values selected by a boolean expression
+##    passed as a filter to this routine.
 ##
 ##  Assumption:
 ##    Since bash variable names are passed to this routine, these names
@@ -266,21 +267,20 @@ function OptionRepeatCheck(){
 ##         argument labels.  Position reflects the ordering of the original
 ##         array $1.
 ##    $4 - Variable name of map to receive the filtered option/argument values.
-##    $5 - A bash regular expression (list) that defines a pattern(s) that
-##         effectively either exclusively includes the desired or excludes
-##         the undesireable option/argument labels that match it. When
-##         formulating the expression(s) the variable '$optArg' must
-##         be used to reference the current option/argument label value.
-##         When calling this routine, the regular expression must be 
-##         encapsulated by single quotes.
+##    $5 - A bash boolean expression passed into this routine.  Typically
+##         encapsulated in single quotes.
 ##         Ex: The following expression includes any option that isn't
 ##             a dlw option:'( [[ "$optArg"  =~ ^-[^-].*$ ]] || [[ "$optArg"  =~ ^--.*$ ]] ) && ! [[ "$optArg"  =~ ^--dlw.*$ ]]'
-##    $6 - A boolean value,'true' or 'false', that Specifies either  
-##          
+##    $6 - A boolean valuethat determines if the filter
+##         specified by $5:
+##           'true' -  When the expression evaluates to true, include the
+##                     option/argument in the result.
+##           'false' - When the expression evaluates to true, exclude the
+##                     option/argument from the result.
 ## 
 ##  Outputs:
 ##    When Failure: 
-##      Either it sliently fails or causes a bash scripting error.
+##      Either it silently fails or causes a bash scripting error.
 ##    When Success:
 ##      The passed array variables $3 & $4 contain only those options matching
 ##      the provided filter.
