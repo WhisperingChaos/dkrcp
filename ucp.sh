@@ -37,6 +37,9 @@ VirtCmmdConfigSetDefault () {
     ScriptUnwind "$LINENO" "Unable to determine temp dir from: 'mktemp -u'."
   fi
   HOST_FILE_ROOT="${tempDir}/$(basename "${BASH_SOURCE[4]}")"
+  # note these must be synchronized with the options/arguments defined with this program
+  IMAGE_OPTION_FILTER='[[ $optArg =~ ^--change=[1-9][0-9]*$ ]] || [[ $optArg =~ ^-c=[1-9][0-9]*$ ]] || [ "$optArg" == "--author" ] || [ "$optArg" == "--message" ]'
+  NON_SOURCE_NON_TARGET_ONLY_OPTIONS_ARGS='[[ $optArg =~ ^Arg[1-9][0-9]*$ ]] || [ "$optArg" == "--help" ] || [ "$optArg" == "--version" ] || [ "$optArg" == "--ucpchk-reg" ]'
 }
 ##############################################################################
 ##
@@ -71,7 +74,7 @@ OPTIONS:
     --help=false,-h           Don't display this help message.
     --version=false           Don't display version info.
 
-For more help: https://github.com/WhisperingChaos/dkrcp
+For more help: https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#dkrcp
 
 HELP_DOC
 }
@@ -118,7 +121,7 @@ OPTIONARGS
 ##    Verify the format of the copy argument conforms to one of the types
 ##    expected by the command.
 ##
-##  Inputs:
+##  Input:
 ##    $1 - An argument.
 ##    
 ###############################################################################
@@ -135,10 +138,10 @@ arg_type_format_Verify() {
 ##    in order to cast/unify them into a type that can perform the role in
 ##    docker copy command.
 ##
-##  Inputs:
-##    $1 - The name of a variable representing the array of all options 
+##  Input:
+##    $1 - Variable name representing the array of all options 
 ##         and arguments names in the order encountered on the command line.
-##    $2 - The name of a variable representing an associative map of all
+##    $2 - Variable name representing an associative map of all
 ##         option and argument values keyed by the option/argument names.
 ##
 ###############################################################################
@@ -166,9 +169,15 @@ VirtCmmdExecute(){
   local -A argTargetObj
   target_obj_Create "$optArgMap_ref" "$argTarget" 'argTargetObj'
   local -r argTargetObj
+  # ensure specified options are valid for target object
+  local errorMessage
+  if ! target_obj_arg_options_Check 'argTargetObj' "$optArgLst_ref" "$optArgMap_ref" 'errorMessage'; then
+      target_obj_Rollback 'argTargetObj'
+      ScriptError "$errorMessage"
+      return
+  fi
   if (( ${#argSourceList[@]} > 1 )); then
     # linux cp -a requires the target refer to a directory when copying from multiple sources.
-    local errorMessage
     if ! target_obj_arg_PermitsMultiSource 'argTargetObj' 'errorMessage'; then
       target_obj_Rollback 'argTargetObj'
       ScriptError "$errorMessage"
@@ -214,7 +223,7 @@ VirtCmmdExecute(){
 ##    from the single targeted one.  Source arguments are the leftmost ones
 ##    while the last or rightmost is the target.
 ##
-##  Inputs:
+##  Input:
 ##    $1 - Source object map providing following interface:
 ##         'objType' - provides the source's type.
 ##    $2 - Target object map providing following interface:
@@ -230,12 +239,12 @@ arg_source_target(){
   ##    one specified.  The order as they appeared in the provided argument
   ##    list must be preserved.
   ##
-  ##  Inputs:
-  ##    $1 - The name of a variable representing the array of all options 
+  ##  Input:
+  ##    $1 - Variable name representing the array of all options 
   ##         and arguments names in the order encountered on the command line.
-  ##    $2 - The name of a variable representing an associative map of all
+  ##    $2 - Variable name representing an associative map of all
   ##         option and argument values keyed by the option/argument names.
-  ##    $3 - The name of a variable representing an array which will contain
+  ##    $3 - Variable name representing an array which will contain
   ##         all the source argument values.
   ##
   ###############################################################################
@@ -263,12 +272,12 @@ arg_source_target(){
   ##    argument value that appears as the last/rightmost argument on the 
   ##    command line.
   ##
-  ##  Inputs:
-  ##    $1 - The name of a variable representing the array of all options 
+  ##  Input:
+  ##    $1 - Variable name representing the array of all options 
   ##         and arguments names in the order encountered on the command line.
-  ##    $2 - The name of a variable representing an associative map of all
+  ##    $2 - Variable name representing an associative map of all
   ##         option and argument values keyed by the option/argument names.
-  ##    $3 - The name of a variable representing an array which will contain
+  ##    $3 - Variable name representing an array which will contain
   ##         only the singlet target argument value.
   ##
   ###############################################################################
@@ -289,14 +298,14 @@ arg_source_target(){
   ##  Purpose:
   ##    A helper function to simply return all the argument values.
   ##
-  ##  Inputs:
-  ##    $1 - The name of a variable representing the array of all options 
+  ##  Input:
+  ##    $1 - Variable name representing the array of all options 
   ##         and arguments names in the order encountered on the command line.
-  ##    $2 - The name of a variable representing an associative map of all
+  ##    $2 - Variable name representing an associative map of all
   ##         option and argument values keyed by the option/argument names.
-  ##    $3 - The name of a variable representing the array of all options 
+  ##    $3 - Variable name representing the array of all options 
   ##         and arguments names in the order encountered on the command line.
-  ##    $4 - The name of a variable representing an associative map of all
+  ##    $4 - Variable name representing an associative map of all
   ##         option and argument values keyed by the option/argument names.
   ##
   ###############################################################################
@@ -315,12 +324,12 @@ arg_source_target(){
 ##  Purpose:
 ##    Determine if source type can be copied to the desired target type.
 ##
-##  Inputs:
+##  Input:
 ##    $1 - Source arguments entered by the command line.
 ##    $2 - Target argument type determined by the target argument entered
 ##         on the command line.
 ##
-##  Outputs:
+##  Output:
 ##    When successful: Nothing - all source arguments are compatible with target.
 ##    Otherwise:       Message to STDERR
 ##
@@ -359,14 +368,14 @@ source_type_interface(){
   ##    below needed to transform a source argument into a reference needed
   ##    by the docker cp command.
   ##
-  ##  Inputs:
-  ##    $1 - The name of a variable representing an associative map of all
+  ##  Input:
+  ##    $1 - Variable name representing an associative map of all
   ##         option and argument values keyed by the option/argument names.
   ##    $2 - The value of a source argument.
-  ##    $3 - The name of a variable representing an associative map to
+  ##    $3 - Variable name representing an associative map to
   ##         persist both public and private property values.
   ##
-  ##  Outputs:
+  ##  Output:
   ##    $3 - An updated associative map containig values for 
   ##         both public and private property values.
   ##
@@ -379,10 +388,10 @@ source_type_interface(){
   ##  Purpose:
   ##    Return the source object/argument type.
   ##
-  ##  Inputs:
-  ##    $1 - The name of a variable to receive type value string.
+  ##  Input:
+  ##    $1 - Variable name to receive type value string.
   ##
-  ##  Outputs:
+  ##  Output:
   ##    $1 - Updated to reflect the type value string.
   ##
   ###############################################################################
@@ -394,12 +403,12 @@ source_type_interface(){
   ##  Purpose:
   ##    Return a source docker cp argument.
   ##
-  ##  Inputs:
+  ##  Input:
   ##    $1 - This pointer - associative map variable name of the type that 
   ##         supports this interface.
   ##    $2 - A variable name that will be assigned the docker cp argument value.
   ##
-  ##  Outputs:
+  ##  Output:
   ##    $2 - Updated to reflect the docker cp argument value.
   ##
   ###############################################################################
@@ -411,8 +420,8 @@ source_type_interface(){
   ##  Purpose:
   ##    Liberate any resources held by the source object/argument type.
   ##
-  ##  Inputs:
-  ##    $1 - The name of a variable representing the associative map constructed
+  ##  Input:
+  ##    $1 - Variable name representing the associative map constructed
   ##         by the source_obj_Create method.
   ##
   ###############################################################################
@@ -465,14 +474,14 @@ target_type_interface(){
   ##    below needed to transform a target argument into a reference needed
   ##    by the docker cp command.
   ##
-  ##  Inputs:
-  ##    $1 - The name of a variable representing an associative map of all
+  ##  Input:
+  ##    $1 - Variable name representing an associative map of all
   ##         option and argument values keyed by the option/argument names.
   ##    $2 - The value of a target argument.
-  ##    $3 - The name of a variable representing an associative map to
+  ##    $3 - Variable name representing an associative map to
   ##         persist both public and private property values.
   ##
-  ##  Outputs:
+  ##  Output:
   ##    $3 - An updated associative map containig values for 
   ##         both public and private property values.
   ##
@@ -485,10 +494,10 @@ target_type_interface(){
   ##  Purpose:
   ##    Return the target object/argument type.
   ##
-  ##  Inputs:
-  ##    $1 - The name of a variable to receive type value string.
+  ##  Input:
+  ##    $1 - Variable name to receive type value string.
   ##
-  ##  Outputs:
+  ##  Output:
   ##    $1 - Updated to reflect the type value string.
   ##
   ###############################################################################
@@ -500,12 +509,12 @@ target_type_interface(){
   ##  Purpose:
   ##    Return a target docker cp argument.
   ##
-  ##  Inputs:
+  ##  Input:
   ##    $1 - This pointer - associative map variable name of the type that 
   ##         supports this interface.
   ##    $2 - A variable name that will be assigned the docker cp argument value.
   ##
-  ##  Outputs:
+  ##  Output:
   ##    $2 - Updated to reflect the docker cp argument value.
   ##
   ###############################################################################
@@ -515,15 +524,38 @@ target_type_interface(){
   ##############################################################################
   ##
   ##  Purpose:
+  ##    Determine if target options were specified that aren't supported by 
+  ##    the targeted object.
+  ##
+  ##  Input:
+  ##    $1 - Variable name representing the associative map constructed
+  ##         by the target_obj_Create method.
+  ##    $2 - Variable name representing the array of all options 
+  ##         and arguments names in the order encountered on the command line.
+  ##    $3 - Variable name representing an associative map of all
+  ##         option and argument values keyed by the option/argument names.
+  ##    $4 - Variable name to potentially return error message
+  ##
+  ##  Output:
+  ##    When error:
+  ##      Assign error message to $4 and return.
+  ##
+  ###############################################################################
+  target_obj_arg_options_Check(){
+    ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
+  }
+  ##############################################################################
+  ##
+  ##  Purpose:
   ##    Does the target argument accept data from multiple sources.
   ##
-  ##  Inputs:
+  ##  Input:
   ##    $1 - This pointer - associative map variable name of the type that 
   ##         supports this interface.
   ##    $2 - A variable name that accepts a message explaining a detected
   ##         incompatibility.
   ##
-  ##  Outputs:
+  ##  Output:
   ##    When success: Nothing.
   ##    Otherwise: $2 - Updated with incompatibility reason.
   ##
@@ -537,12 +569,12 @@ target_type_interface(){
   ##    After a successful copy, perform additional processing required to
   ##    complete the copy operation.
   ##
-  ##  Inputs:
-  ##    $1 - The name of a variable representing the associative map constructed
+  ##  Input:
+  ##    $1 - Variable name representing the associative map constructed
   ##         by the target_obj_Create method.
-  ##    $2 - The name of a variable representing the array of all options 
+  ##    $2 - Variable name representing the array of all options 
   ##         and arguments names in the order encountered on the command line.
-  ##    $3 - The name of a variable representing an associative map of all
+  ##    $3 - Variable name representing an associative map of all
   ##         option and argument values keyed by the option/argument names.
   ##
   ###############################################################################
@@ -554,8 +586,8 @@ target_type_interface(){
   ##  Purpose:
   ##    Liberate any resources held by the target object/argument type.
   ##
-  ##  Inputs:
-  ##    $1 - The name of a variable representing the associative map constructed
+  ##  Input:
+  ##    $1 - Variable name representing the associative map constructed
   ##         by the target_obj_Create method.
   ##
   ###############################################################################
@@ -568,8 +600,8 @@ target_type_interface(){
   ##    When possible, revert to prior state.  Assumes error occurred befor
   ##    target_obj_Commit executed.
   ##
-  ##  Inputs:
-  ##    $1 - The name of a variable representing the associative map constructed
+  ##  Input:
+  ##    $1 - Variable name representing the associative map constructed
   ##         by the target_obj_Create method.
   ##
   ###############################################################################
@@ -605,6 +637,12 @@ target_type_simple(){
   }
   target_obj_type_Get(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
+  }
+  target_obj_arg_options_Check(){
+    # simple targets currently have no options.
+    local targetTypeName
+    target_obj_type_Get 'targetTypeName'
+    target_arg_only_options_Exclude "$2" "$3" "$targetTypeName" '' "$4"
   }
   target_obj_arg_PermitsMultiSource(){
     ref_simple_value_Set "$errorMess_ref" "Target does not support more than one source."
@@ -806,11 +844,9 @@ target_type_imagefilepath(){
     local -r optArgMap_ref="$3"
     local -a dockerCommitOptList
     local -A dockerCommitOptMap
-    AssociativeMapKeyValueEcho "$optArgMap_ref">&2
-    if ! OptionsArgsFilter "$optArgList_ref" "$optArgMap_ref" 'dockerCommitOptList' 'dockerCommitOptMap' '[[ $optArg =~ ^--change=[1-9][0-9]*$ ]] || [[ $optArg =~ ^-c=[1-9][0-9]*$ ]] || [ "$optArg" == "--author" ] || [ "$optArg" == "--message" ]' 'true'; then
+    if ! OptionsArgsFilter "$optArgList_ref" "$optArgMap_ref" 'dockerCommitOptList' 'dockerCommitOptMap' "$IMAGE_OPTION_FILTER" 'true'; then
       ScriptUnwind "$LINENO" "Problem filtering options for docker commit."
     fi
-    AssociativeMapKeyValueEcho 'dockerCommitOptMap'>&2
     local dockerCommitOpt=''
     if (( ${#dockerCommitOptList[@]} > 0 )); then
       if ! dockerCommitOpt="$( OptionsArgsGen 'dockerCommitOptList' 'dockerCommitOptMap' )"; then
@@ -822,6 +858,11 @@ target_type_imagefilepath(){
     eval local \-r entryPtCurrent\=\"\$\{$targetObj_ref\[entryPtCurrent\]\}\"
     eval local \-r imageName\=\"\$\{$targetObj_ref\[imageName\]\}\"
     eval docker commit $entryptNullify $dockerCommitOpt \$targetContainer \$imageName
+  }
+  target_obj_arg_options_Check(){
+    local imageFilePathType
+    target_obj_type_Get 'imageFilePathType'
+    target_arg_only_options_Exclude "$2" "$3" "$imageFilePathType" "$IMAGE_OPTION_FILTER" "$4"
   }
   target_obj_arg_PermitsMultiSource(){
     local -r this_ref="$1"
@@ -855,7 +896,7 @@ target_type_imagefilepath(){
 ##  Purpose:
 ##    For all know types return true.
 ##
-##  Inputs:
+##  Input:
 ##    $1  - Type name string.
 ##
 ##  When success:
@@ -875,10 +916,59 @@ type_valid_AllIs(){
 ##############################################################################
 ##
 ##  Purpose:
+##    Process command option/argument list and map to identify  entries
+##    that aren't supported by the target argument.
+##
+##  Input:
+##    $1 - Variable name representing the array of all options 
+##         and arguments names in the order encountered on the command line.
+##    $2 - Variable name representing an associative map of all
+##         option and argument values keyed by the option/argument names.
+##    $3 - Target type name string.
+##    $4 - Option argument filter defining all valid options for a given
+##         target type.
+##    $5 - Variable name to potentially return error message
+##
+##  Output:
+##    When success: nothing.
+##    Otherwise:    $3 - set to error message.
+##
+###############################################################################
+target_arg_only_options_Exclude(){
+  local -r optArgList_ref="$1"
+  local -r optArgMap_ref="$2"
+  local -r targetTypeName="$3"
+  local -r targetTypeOptsAllowFilter="$4"
+  local -r errorMessage_ref="$5"
+  local -a targetOnlyOptArgList
+  local -A targetOnlyOptArgMap
+  # remove source only options and any arguments.
+  if ! OptionsArgsFilter "$optArgList_ref" "$optArgMap_ref" 'targetOnlyOptArgList' 'targetOnlyOptArgMap' "$NON_SOURCE_NON_TARGET_ONLY_OPTIONS_ARGS" 'false'; then
+    ScriptUnwind "$LINENO" "Problem filtering target only options and arguments."
+  fi
+  if (( ${#targetOnlyOptArgList[@]} < 1 )); then
+    # all options were source only options
+    return
+  fi
+  # remove expected target options.
+  local -a targetOnlyOptArgListResult
+  local -A targetOnlyOptArgMapResult
+  if [ -n "$targetTypeOptsAllowFilter" ] && ! OptionsArgsFilter 'targetOnlyOptArgList' 'targetOnlyOptArgMap' 'targetOnlyOptArgListResult' 'targetOnlyOptArgMapResult' "$targetTypeOptsAllowFilter" 'false'; then
+    ScriptUnwind "$LINENO" "Problem filtering target type: '$targetTypeName' specific options."
+  fi
+  if (( ${#targetOnlyOptArgListResult[@]} > 0 )); then
+    local -r unsupportedOptions="$( OptionsArgsGen 'targetOnlyOptArgListResult' 'targetOnlyOptArgMapResult' )"
+    ref_simple_value_Set "$errorMessage_ref" "Unsupported options: '$unsupportedOptions' specified for TARGET type: '$targetTypeName'"
+    return 1
+  fi
+}
+##############################################################################
+##
+##  Purpose:
 ##    Determine the copy strategy to execute given the source and target
 ##    types.  
 ##
-##  Inputs:
+##  Input:
 ##    $1 - Type of source argument.
 ##    $2 - Source argument format accepted by docker cp
 ##    $3 - Type of target argument.
@@ -911,11 +1001,11 @@ cp_strategy_Exec(){
 ##    Use the typical docker cp command to copy a source object to
 ##    the target one.
 ##
-##  Inputs:
+##  Input:
 ##    $1 - Source argument format accepted by docker cp
 ##    $2 - Target argument format accepted by docker cp
 ##
-##  Outputs:
+##  Output:
 ##    When successful:
 ##      nothing.
 ##    When failure:
@@ -938,13 +1028,13 @@ cp_simple(){
 ##    copying the source object to the file system associated to this process
 ##    and then forward the contents of this local copy to the target.  
 ##
-##  Inputs:
+##  Input:
 ##    $1 - Source object map providing following interface:
 ##         'objRef' - provides the container file path
 ##    $2 - Target object map providing following interface:
 ##         'objRef' - provides the container file path
 ##
-##  Outputs:
+##  Output:
 ##    When successful:
 ##      nothing.
 ##    When failure:
@@ -1014,11 +1104,11 @@ cp_complex(){
 ##  Purpose:
 ##    Determine the argument type by examining its format.
 ##
-##  Inputs:
+##  Input:
 ##    $1 - A SOURCE or TARGET command line argument.
 ##    $2 - A variable name to return the decided type.
 ##    
-##  Outputs:
+##  Output:
 ##    When Success:
 ##    $2 Reference assigned the decided type:
 ##      'stream', 'imagefilepath', 'containerimagefilepath', or 'filepath'.
@@ -1059,10 +1149,10 @@ arg_type_format_decide() {
 ##  Purpose:
 ##    Determine if a container path refers to a directory.
 ##
-##  Inputs:
+##  Input:
 ##    $1 - Docker container path format accepted by docker cp command.
 ##
-##  Outputs:
+##  Output:
 ##    When success:
 ##       Container path refers to an existing directory
 ##
@@ -1092,12 +1182,12 @@ container_filepath_IsDir(){
 ##  Assumes:
 ##    A two '::' separate the image name/uuid from file path.
 ##
-##  Inputs:
+##  Input:
 ##    $1 - A name/UUID delimited by '::' from a concatenated file path.
 ##    $2 - A variable name to receive just the name or UUID portion.
 ##    $3 - A varialbe name to receive just the file path portion.
 ##    
-##  Outputs:
+##  Output:
 ##    When Success:
 ##    $2 - Updated variable whose value reflects only the image name/UUID.
 ##    $3 - Updated arialbe whose value reflects only the file path portion.
@@ -1126,7 +1216,7 @@ image_nameUUID_filepath_Extract(){
 ##  Assumes:
 ##    Input label conforms to either image repository or image UUID format.
 ##
-##  Inputs:
+##  Input:
 ##    $1 - An image name or potential UUID.  
 ##    $2 - Extent scope of image name resolution to a registry:
 ##         'true' - scope includes registry.
@@ -1138,7 +1228,7 @@ image_nameUUID_filepath_Extract(){
 ##    $4 - A variable to receive a value that determines if $1 is a
 ##         repository name.  
 ## 
-##  Outputs:
+##  Output:
 ##    $2 - Updated variable containes normalized name.
 ##    $3 - Updated variable value:
 ##         'true' - $1 is a considered a repository name.
@@ -1185,7 +1275,7 @@ image_normalized_label_instance_Exists(){
 ##      that mimics a UUID.  At this time 11/2015 Docker doesn't provide a 
 ##      a mechanism to specify a resolution name space for an argument.
 ##
-##  Inputs:
+##  Input:
 ##    $1 - An image name or full/partial UUID.
 ##    $2 - A boolean value that determines the scope of the search.
 ##         'true' - scope includes a pull from the connected registry.
@@ -1195,7 +1285,7 @@ image_normalized_label_instance_Exists(){
 ##         'false' - $1 is a repository name
 ##    $4 - A variable name to contain the image's full UUID 
 ##
-##  Outputs:
+##  Output:
 ##    When success:
 ##      $3 - Variable indicates if $1 is or isn't UUID.
 ##      $4 - Variable assigned full UUID value.
@@ -1250,7 +1340,7 @@ image_Search(){
 ##    Convert an image to a container.  As a container, the image can be
 ##    copied to/from using docker cp command introduced in 1.8.
 ##
-##  Inputs:
+##  Input:
 ##    $1 - Existing image name or image UUID.
 ##    $2 - A variable to contain the resulting container UUID created from
 ##         the given image.
@@ -1261,7 +1351,7 @@ image_Search(){
 ##         the ENTRYPOINT must be nullified.  This variable records, if 
 ##         necessary, the nullify directive.
 ##
-##  Outputs:
+##  Output:
 ##    $2 - Variable updated to reflect newly created container UUID.
 ##    $3 - Variable updated to ENTRYPOINT directive.
 ##
@@ -1298,10 +1388,10 @@ image_container_Create(){
 ##    Create an new image from 'scratch'.  'scratch' generates a default
 ##    file system.
 ##
-##  Inputs:
+##  Input:
 ##    $1 - Image name.
 ##
-##  Outputs:
+##  Output:
 ##    A new image exists in the local repository with the repository name of $1.
 ##    STDOUT - suppressed.
 ##
