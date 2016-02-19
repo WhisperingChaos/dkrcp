@@ -29,9 +29,17 @@ OPTIONS:
 Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandline/cp/) by:
   * Facilitating image creation or adaptation by simply copying files.  When copying to an existing image, its state is unaffected, as copy preserves its immutability by creating a new layer.
   * Enabling the specification of mutiple copy sources, including other images, to improve operational alignment with linux [```cp -a```](https://en.wikipedia.org/wiki/Cp_%28Unix%29) and minimize layer creation when TARGET refers to an image.
+  * Supporting the direct expression of copy semantics where both SOURCE and TARGET arguments refer to containers.
  
 #### Copy Semantics
-Since ```dkrcp``` relies on ```docker cp``` its [documentation](https://docs.docker.com/engine/reference/commandline/cp/) describes the expected behavior of ```dkrcp``` when specifying a single SOURCE argument.  However, the following table, formulated while designing dkrcp may present the semantics more clearly than the documention associated to ```docker cp```.
+Since ```dkrcp``` relies on ```docker cp``` its [documentation](https://docs.docker.com/engine/reference/commandline/cp/) describes the expected behavior of ```dkrcp``` when specifying a single SOURCE argument.  Therefore, ```docker cp``` explinations concerning:
+  * tarball streams ' - ',
+  * container's root directory treated as the current one when copying to/fromm relative paths,
+  * use of the ':' as means of delimiting a container UUID/name from its associated path,
+  * UID/GID permission settings
+  * 
+
+However, the following tabular form offers an equivalent but visually different presentation than the documention associated to ```docker cp```.
 
 |         | SOURCE File  | SOURCE Directory | [SOURCE Directory Content](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#source-directory-content-an-existing-directory-path-appended-with-) | SOURCE Stream |
 | :--:    | :----------: | :---------------:| :---------------: | :-------: |
@@ -43,7 +51,11 @@ Since ```dkrcp``` relies on ```docker cp``` its [documentation](https://docs.doc
 
 ######TARGET assumed directory: The rightmost, last, name of a specified [path](https://en.wikipedia.org/wiki/Path_%28computing%29) suffixed by '/'.  It is assumed to reference an existing directory.
 
-######SOURCE Directory Content: An existing directory path appended with '/.' 
+######SOURCE Directory Content: An existing directory path appended with '/.'
+
+The multi-SOURCE copy semantics simply converges to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it be a file, directory, or stream is successfully copied, as long as the TARGET refers to a a pre-existing directory, otherwise, it fails.  
+
+
 
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
