@@ -59,7 +59,8 @@ However, the following tabular form offers an equivalent description of copy beh
 
 The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it a file, directory, or stream is successfully copied, as long as the TARGET refers to a preexisting directory, otherwise, the operation fails.  
 
-
+##### Images as SOURCE/TARGET
+A double colon '::' delimiter classifies the file path as referring to an image, differenciating it from the single one denoting a container reference.  Therefore, when referencing an image involving a tag  
 
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
