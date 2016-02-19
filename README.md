@@ -32,12 +32,16 @@ Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandli
   * Supporting the direct expression of copy semantics where both SOURCE and TARGET arguments refer to containers.
  
 #### Copy Semantics
-Since ```dkrcp``` relies on ```docker cp``` its [documentation](https://docs.docker.com/engine/reference/commandline/cp/) describes the expected behavior of ```dkrcp``` when specifying a single SOURCE argument.  Therefore, ```docker cp``` explinations concerning:
+```dkrcp``` relies on ```docker cp```, therefore, ```docker cp```'s [documentation](https://docs.docker.com/engine/reference/commandline/cp/) describes much of the expected behavior of ```dkrcp```, especially when specifying a single SOURCE argument.  Due to this reliance ```docker cp``` explinations concerning:
   * tarball streams ' - ',
   * container's root directory treated as the current one when copying to/fromm relative paths,
+  * working directory of ```docker cp``` anchoring relative host filesystem paths,
+  * desire to mimic ```cp -a``` recursive navigation and preserve file permissions,
+  * ownership UID/GID permission settings when copying to/from containers, 
   * use of the ':' as means of delimiting a container UUID/name from its associated path,
-  * UID/GID permission settings
-  * 
+  * inability to copy certain files,
+
+are all applicable to ```dkrcp``` and will not be duplicated.
 
 However, the following tabular form offers an equivalent but visually different presentation than the documention associated to ```docker cp```.
 
