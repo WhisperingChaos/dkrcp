@@ -62,6 +62,8 @@ The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET ex
 ##### Images as SOURCE/TARGET
 A double colon '::' delimiter classifies the file path as referring to an image, differenciating it from the single one denoting a container reference.  Therefore, an argument referencing an image involving a tag would appear similar to '```image_name:image_tag::etc/hostname```'.
 
+Copying from/to a image involves the creation ([```docker create```])(https://docs.docker.com/engine/reference/commandline/create) of a container from the specified container.  
+
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
     * Although special effort has been applied to minimize the size of Official Docker Hub images, the inability of Docker's [builder](https://github.com/docker/docker/tree/master/builder) component to separate build time produced artifacts and their required dependencies continues to pollute the runtime image with unnecessary artifacts increasing the runtime container's attack surface.  For example, images requiring build tool chains, like golang and C++, incorporate compilers, linkers, dependent libraries, ... into their files systems.  At best these tool chain resources can be 'logically' removed from the file system through their deletion.  These and other file system artifacts employed by the build, like C++ object files, will remain accessible in the runtime file system if not properly removed by the build process.  
