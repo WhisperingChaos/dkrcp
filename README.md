@@ -57,7 +57,7 @@ However, the following tabular form offers an equivalent but visually different 
 
 ######SOURCE Directory Content: An existing directory path appended with '/.'
 
-The multi-SOURCE copy semantics simply converges to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it be a file, directory, or stream is successfully copied, as long as the TARGET refers to a a pre-existing directory, otherwise, it fails.  
+The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it a file, directory, or stream is successfully copied, as long as the TARGET refers to a a pre-existing directory, otherwise, the operation fails.  
 
 
 
