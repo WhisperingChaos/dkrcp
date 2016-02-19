@@ -62,7 +62,7 @@ The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET ex
 ##### Images as SOURCE/TARGET
 A double colon '::' delimiter classifies the file path as referring to an image, differenciating it from the single one denoting a container reference.  Therefore, an argument referencing an image involving a tag would appear similar to '```image_name:image_tag::etc/hostname```'.
 
-Copying from/to a image involves the creation ([```docker create```])(https://docs.docker.com/engine/reference/commandline/create) of a container from the specified container.  
+Copying from/to an existing image involves the creation [(```docker create```)](https://docs.docker.com/engine/reference/commandline/create) of a container.  Container creation occurs even when the image lacks a defined entrypont, as a 'null' entrypoint hack is applied to subvert ```docker create``` insistance that one exist.  After successful container construction, ```dkrcp``` adapts the image copy process using the temporary container as SOURCE/TARGET argument for the  read/update this temporary container.  Once the operation completes, either successfully or otherwise, the temporary container(s) are removed.   
 
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
