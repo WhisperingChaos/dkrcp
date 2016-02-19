@@ -29,7 +29,7 @@ OPTIONS:
 Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandline/cp/) by:
   * Facilitating image creation or adaptation by simply copying files.  When copying to an existing image, its state is unaffected, as copy preserves its immutability by creating a new layer.
   * Enabling the specification of mutiple copy sources, including other images, to improve operational alignment with linux [```cp -a```](https://en.wikipedia.org/wiki/Cp_%28Unix%29) and minimize layer creation when TARGET refers to an image.
-  * Supporting the direct expression of copy semantics where both SOURCE and TARGET arguments refer to containers.
+  * Supporting the direct expression of copy semantics where SOURCE and TARGET arguments concurrently refer to containers.
  
 #### Copy Semantics
 ```dkrcp``` relies on ```docker cp```, therefore, ```docker cp```'s [documentation](https://docs.docker.com/engine/reference/commandline/cp/) describes much of the expected behavior of ```dkrcp```, especially when specifying a single SOURCE argument.  Due to this reliance ```docker cp``` explinations concerning:
@@ -60,7 +60,7 @@ However, the following tabular form offers an equivalent description of copy beh
 The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it a file, directory, or stream is successfully copied, as long as the TARGET refers to a preexisting directory, otherwise, the operation fails.  
 
 ##### Images as SOURCE/TARGET
-A double colon '::' delimiter classifies the file path as referring to an image, differenciating it from the single one denoting a container reference.  Therefore, when referencing an image involving a tag  
+A double colon '::' delimiter classifies the file path as referring to an image, differenciating it from the single one denoting a container reference.  Therefore, an argument referencing an image involving a tag would appear similar to '```image_name:image_tag::etc/hostname```'.
 
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
