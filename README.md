@@ -34,16 +34,16 @@ Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandli
 #### Copy Semantics
 ```dkrcp``` relies on ```docker cp```, therefore, ```docker cp```'s [documentation](https://docs.docker.com/engine/reference/commandline/cp/) describes much of the expected behavior of ```dkrcp```, especially when specifying a single SOURCE argument.  Due to this reliance ```docker cp``` explinations concerning:
   * tarball streams ' - ',
-  * container's root directory treated as the current one when copying to/fromm relative paths,
-  * working directory of ```docker cp``` anchoring relative host filesystem paths,
+  * container's root directory treated as the current one when copying to/from relative paths,
+  * working directory of ```docker cp``` anchoring relative host file system paths,
   * desire to mimic ```cp -a``` recursive navigation and preserve file permissions,
   * ownership UID/GID permission settings when copying to/from containers, 
-  * use of the ':' as means of delimiting a container UUID/name from its associated path,
+  * use of ':' as means of delimiting a container UUID/name from its associated path,
   * inability to copy certain files,
 
-are all applicable to ```dkrcp``` and will not be duplicated.
+are all applicable to ```dkrcp```.
 
-However, the following tabular form offers an equivalent but visually different presentation than the documention associated to ```docker cp```.
+However, the following tabular form offers an equivalent description of copy behavior but visually different than the documention associated to ```docker cp```.
 
 |         | SOURCE File  | SOURCE Directory | [SOURCE Directory Content](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#source-directory-content-an-existing-directory-path-appended-with-) | SOURCE Stream |
 | :--:    | :----------: | :---------------:| :---------------: | :-------: |
@@ -57,7 +57,7 @@ However, the following tabular form offers an equivalent but visually different 
 
 ######SOURCE Directory Content: An existing directory path appended with '/.'
 
-The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it a file, directory, or stream is successfully copied, as long as the TARGET refers to a pre-existing directory, otherwise, the operation fails.  
+The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it a file, directory, or stream is successfully copied, as long as the TARGET refers to a preexisting directory, otherwise, the operation fails.  
 
 
 
