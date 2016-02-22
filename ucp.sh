@@ -37,14 +37,25 @@ VirtCmmdConfigSetDefault () {
     ScriptUnwind "$LINENO" "Unable to determine temp dir from: 'mktemp -u'."
   fi
   HOST_FILE_ROOT="${tempDir}/$(basename "${BASH_SOURCE[4]}")"
-  # note these must be synchronized with the options/arguments defined with this program
+  # note IMAGE_OPTION_FILTER and NON_SOURCE_NON_TARGET_ONLY_OPTIONS_ARGS must be synchronized with
+  # the options/arguments defined with this program.  IMAGE_OPTION_FILTER defines
+  # filtering criteria to extract options from the command line when targeted images.  Currently
+  # these options include all options defined for docker commit.  NON_SOURCE_NON_TARGET_ONLY_OPTIONS_ARGS
+  # defines a filter to remove arguments and options.  The options removed are those that can be applied to
+  # both source and target.
   IMAGE_OPTION_FILTER='[[ $optArg =~ ^--change=[1-9][0-9]*$ ]] || [[ $optArg =~ ^-c=[1-9][0-9]*$ ]] || [ "$optArg" == "--author" ] || [ "$optArg" == "--message" ]'
   NON_SOURCE_NON_TARGET_ONLY_OPTIONS_ARGS='[[ $optArg =~ ^Arg[1-9][0-9]*$ ]] || [ "$optArg" == "--help" ] || [ "$optArg" == "--version" ] || [ "$optArg" == "--ucpchk-reg" ]'
+  DOCKER_CP_OPTION_FILTER='[ "false" == "true" ]'
 }
 ##############################################################################
 ##
 ##  Purpose:
 ##    see VirtCmmdInterface.sh -> VirtCmmdHelpDisplay
+##
+##  Note:
+##    When adding/updating/removing OPTIONS, the following option filters may
+##    Need to change: IMAGE_OPTION_FILTER, NON_SOURCE_NON_TARGET_ONLY_OPTIONS_ARGS
+##    and DOCKER_CP_OPTION_FILTER.
 ##
 ###############################################################################
 VirtCmmdHelpDisplay () {
@@ -184,6 +195,9 @@ VirtCmmdExecute(){
       return
     fi
   fi
+  local dockerCpOpts=''
+  cp_source_options_Extract "$optArgLst_ref" "$optArgMap_ref" 'dockerCpOpts'
+  local -r dockerCpOpts
   local targetReference
   target_obj_docker_arg_Get 'argTargetObj' 'targetReference'
   local -r targetReference
@@ -202,7 +216,7 @@ VirtCmmdExecute(){
     source_obj_docker_arg_Get 'argSourceObj' 'sourceReference'
     local -r sourceReference
     # execute in a sub-shell in order to cleanup from copy exceptions  
-    if ! $( cp_strategy_Exec "$argSourceType" "$sourceReference" "$argTargetType" "$targetReference" ); then
+    if ! $( cp_strategy_Exec "$dockerCpOpts" "$argSourceType" "$sourceReference" "$argTargetType" "$targetReference" ); then
       #TODO: remove
       #cp_strategy_failure_Mess 'argSourceObj' 'argTargetObj'
       source_obj_Release 'argSourceObj'
@@ -965,21 +979,57 @@ target_arg_only_options_Exclude(){
 ##############################################################################
 ##
 ##  Purpose:
+##    Extract docker cp options defined by DOCKER_CP_OPTION_FILTER 
+##    from the command line. 
+##
+##  Input:
+##    $1 - Variable name representing the array of all options 
+##         and arguments names in the order encountered on the command line.
+##    $2 - Variable name representing an associative map of all
+##         option and argument values keyed by the option/argument names.
+##    $3 - Variable name to a string that will accept zero or more docker cp
+##         options extracted from $1 & $2.
+##    DOCKER_CP_OPTION_FILTER - A bash boolean expression that selects
+##
+##  Output:
+##    $3 - updated to contain select command line options. 
+##
+###############################################################################
+cp_source_options_Extract(){
+  local -r optsArgLst_ref="$1"
+  local -r optsArgMap_ref="$2"
+  local -r dockerCpOpts_ref="$3"
+  ref_simple_value_Set "$dockerCpOpts_ref" ''
+  local -a dockerCpOptLst
+  local -A dockerCpOptMap
+  if ! OptionsArgsFilter "$optsArgLst_ref" "$optsArgMap_ref" 'dockerCpOptLst' 'dockerCpOptMap'  "$DOCKER_CP_OPTION_FILTER" 'true'; then
+    ScriptUnwind "$LINENO" "Problem extracting docker copy options using filter: '$DOCKER_CP_OPTION_FILTER'."
+  fi
+  local -r dockerCpOptLst
+  local -r dockerCpOptMap
+  if (( ${#dockerCpOptLst[@]} < 1 )); then return; fi
+  ref_simple_value_Set "$dockerCpOpts_ref" "$( OptionsArgsGen 'dockerCpOptLst' 'dockerCpOptMap' )"
+}
+##############################################################################
+##
+##  Purpose:
 ##    Determine the copy strategy to execute given the source and target
 ##    types.  
 ##
 ##  Input:
-##    $1 - Type of source argument.
-##    $2 - Source argument format accepted by docker cp
-##    $3 - Type of target argument.
-##    $4 - Target argument format accepted by docker cp
+##    $1 - docker cp options. 
+##    $2 - Type of source argument.
+##    $3 - Source argument format accepted by docker cp
+##    $4 - Type of target argument.
+##    $5 - Target argument format accepted by docker cp
 ##
 ###############################################################################
 cp_strategy_Exec(){
-  local -r sourceType="$1"
-  local -r sourceArgDockercp="$2"
-  local -r targetType="$3"
-  local -r targetArgDockercp="$4"
+  local -r dockerCpOpts="$1"
+  local -r sourceType="$2"
+  local -r sourceArgDockercp="$3"
+  local -r targetType="$4"
+  local -r targetArgDockercp="$5"
 
   # generally apply the 'simple' copy strategy
   local copyStrategy='cp_simple'
@@ -993,7 +1043,7 @@ cp_strategy_Exec(){
     local copyStrategy='cp_complex'
   fi
   local -r copyStrategy     
-  $copyStrategy "$sourceArgDockercp" "$targetArgDockercp"
+  $copyStrategy "$dockerCpOpts" "$sourceArgDockercp" "$targetArgDockercp"
 }
 ##############################################################################
 ##
@@ -1002,8 +1052,9 @@ cp_strategy_Exec(){
 ##    the target one.
 ##
 ##  Input:
-##    $1 - Source argument format accepted by docker cp
-##    $2 - Target argument format accepted by docker cp
+##    $1 - docker cp options.
+##    $2 - Source argument format accepted by docker cp
+##    $3 - Target argument format accepted by docker cp
 ##
 ##  Output:
 ##    When successful:
@@ -1013,10 +1064,10 @@ cp_strategy_Exec(){
 ##
 ###############################################################################
 cp_simple(){
-  local -r sourceArgDocker="$1"
-  local -r targetArgDocker="$2"
-
-  eval docker cp \"\$sourceArgDocker\" \"\$targetArgDocker\" \>\/dev\/null
+  local -r dockerCpOpts="$1"
+  local -r sourceArgDocker="$2"
+  local -r targetArgDocker="$3"
+  eval docker cp $dockerCpOpts \"\$sourceArgDocker\" \"\$targetArgDocker\" \>\/dev\/null
 }
 ##############################################################################
 ##
@@ -1029,9 +1080,10 @@ cp_simple(){
 ##    and then forward the contents of this local copy to the target.  
 ##
 ##  Input:
-##    $1 - Source object map providing following interface:
+##    $1 - docker cp options.
+##    $2 - Source object map providing following interface:
 ##         'objRef' - provides the container file path
-##    $2 - Target object map providing following interface:
+##    $3 - Target object map providing following interface:
 ##         'objRef' - provides the container file path
 ##
 ##  Output:
@@ -1042,21 +1094,23 @@ cp_simple(){
 ##
 ###############################################################################
 cp_complex(){
-  local -r sourceArgDocker="$1"
-  local -r targetArgDocker="$2"
+  local -r dockerCpOpts="$1"
+  local -r sourceArgDocker="$2"
+  local -r targetArgDocker="$3"
 
   docker_stream_Copy(){
-    local -r sourceArgDocker="$1"
-    local -r targetArgDocker="$2"
+    local -r dockerCpOpts="$1"
+    local -r sourceArgDocker="$2"
+    local -r targetArgDocker="$3"
     set -o pipefail
     # redirect first set of errors to null device. This prevents displaying 'write /dev/stdout: broken pipe' message
     # when target isn't valid.  It also silences other messages concerning the source.  However, since there's
     # only one error message that can be recovered from and it is issued by the second docker cp command,
     # these other messages can be safely ignored as the return code will reflect any failure in the pipleline.
     # not meant to be used outside its enclosing function.
-    docker cp "$sourceArgDocker" - 2>/dev/null | docker cp - "$targetArgDocker"
+    eval docker cp $dockerCpOpts \"\$sourceArgDocker\" - 2>/dev/null | docker cp - "$targetArgDocker"
   }
-  if dockedMsg="$(docker_stream_Copy "$sourceArgDocker" "$targetArgDocker" 2>&1 )"; then
+  if dockedMsg="$(docker_stream_Copy "$dockerCpOpts" "$sourceArgDocker" "$targetArgDocker" 2>&1 )"; then
     return
   fi
   if ! [[ $dockedMsg =~ ^destination.+must.be.a.directory ]]; then
@@ -1076,7 +1130,7 @@ cp_complex(){
   if ! mkdir -p "$( dirname "$tmpHostRefTarget" )">/dev/null; then
     ScriptUnwind "$LINENO" "rm failed for: '$tmpHostRefTarget'."
   fi
-  if ! docker cp "$sourceArgDocker" "$tmpHostRefTarget">/dev/null; then
+  if ! eval docker cp $dockerCpOpts \"\$sourceArgDocker\" \"\$tmpHostRefTarget\">/dev/null; then
     ScriptUnwind "$LINENO" "docker cp '$sourceArgDocker', '$tmpHostRefTarget'."
   fi
   if ! docker cp "$tmpHostRefSource" "$targetArgDocker">/dev/null; then
