@@ -29,9 +29,21 @@ OPTIONS:
 Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandline/cp/) by:
   * Facilitating image creation or adaptation by simply copying files.  When copying to an existing image, its state is unaffected, as copy preserves its immutability by creating a new layer.
   * Enabling the specification of mutiple copy sources, including other images, to improve operational alignment with linux [```cp -a```](https://en.wikipedia.org/wiki/Cp_%28Unix%29) and minimize layer creation when TARGET refers to an image.
+  * Supporting the direct expression of copy semantics where SOURCE and TARGET arguments concurrently refer to containers.
  
 #### Copy Semantics
-Since ```dkrcp``` relies on ```docker cp``` its [documentation](https://docs.docker.com/engine/reference/commandline/cp/) describes the expected behavior of ```dkrcp``` when specifying a single SOURCE argument.  However, the following table, formulated while designing dkrcp may present the semantics more clearly than the documention associated to ```docker cp```.
+```dkrcp``` relies on ```docker cp```, therefore, ```docker cp```'s [documentation](https://docs.docker.com/engine/reference/commandline/cp/) describes much of the expected behavior of ```dkrcp```, especially when specifying a single SOURCE argument.  Due to this reliance ```docker cp``` explinations concerning:
+  * tarball streams ' - ',
+  * container's root directory treated as the current one when copying to/from relative paths,
+  * working directory of ```docker cp``` anchoring relative host file system paths,
+  * desire to mimic ```cp -a``` recursive navigation and preserve file permissions,
+  * ownership UID/GID permission settings when copying to/from containers, 
+  * use of ':' as means of delimiting a container UUID/name from its associated path,
+  * inability to copy certain files,
+
+are all applicable to ```dkrcp```.
+
+However, the following tabular form offers an equivalent description of copy behavior but visually different than the documention associated to ```docker cp```.
 
 |         | SOURCE File  | SOURCE Directory | [SOURCE Directory Content](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#source-directory-content-an-existing-directory-path-appended-with-) | SOURCE Stream |
 | :--:    | :----------: | :---------------:| :---------------: | :-------: |
@@ -43,11 +55,18 @@ Since ```dkrcp``` relies on ```docker cp``` its [documentation](https://docs.doc
 
 ######TARGET assumed directory: The rightmost, last, name of a specified [path](https://en.wikipedia.org/wiki/Path_%28computing%29) suffixed by '/'.  It is assumed to reference an existing directory.
 
-######SOURCE Directory Content: An existing directory path appended with '/.' 
+######SOURCE Directory Content: An existing directory path appended with '/.'
+
+The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it a file, directory, or stream is successfully copied, as long as the TARGET refers to a preexisting directory, otherwise, the operation fails.  
+
+##### Images as SOURCE/TARGET
+A double colon '::' delimiter classifies the file path as referring to an image, differenciating it from the single one denoting a container reference.  Therefore, an argument referencing an image involving a tag would appear similar to '```image_name:image_tag::etc/hostname```'.
+
+Copying from/to an existing image involves the creation [(```docker create```)](https://docs.docker.com/engine/reference/commandline/create) of a container.  Container creation occurs even when the image lacks a defined entrypont, as a 'null' entrypoint hack is applied to subvert ```docker create``` insistance that one exist.  After successful container construction, ```dkrcp``` adapts the image copy process using the temporary container as SOURCE/TARGET argument for the  read/update this temporary container.  Once the operation completes, either successfully or otherwise, the temporary container(s) are removed.   
 
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
-    * Although special effort has been applied to minimize the size of Official Docker Hub images, the inability of Docker's [builder](https://github.com/docker/docker/tree/master/builder) component to separate build time produced artifacts and their required dependencies continues to pollute the runtime image with unnecessary and potentially artifacts.  For example, images requiring build tool chains, like golang and C++, 
+    * Although special effort has been applied to minimize the size of Official Docker Hub images, the inability of Docker's [builder](https://github.com/docker/docker/tree/master/builder) component to separate build time produced artifacts and their required dependencies continues to pollute the runtime image with unnecessary artifacts increasing the runtime container's attack surface.  For example, images requiring build tool chains, like golang and C++, incorporate compilers, linkers, dependent libraries, ... into their files systems.  At best these tool chain resources can be 'logically' removed from the file system through their deletion.  These and other file system artifacts employed by the build, like C++ object files, will remain accessible in the runtime file system if not properly removed by the build process.  
   * Facilitates manufacturing images by piplines that gradually evolve either toward or away from their reliance on Dockerfiles.
-    *  To accelerate the adoption of Docker containers, dkrcp can enable a strategy increace developers understanding of Docker through the measured adoption by  encapsulating build tool chains reqired by their application into Docker containers.  
+    *  To accelerate the adoption of Docker containers, strategies dkrcp can enable a strategy increace developers understanding of Docker through the measured adoption by  encapsulating build tool chains reqired by their application into Docker containers.  
   * Encapsulates the reliance on and encoding of several Docker CLI calls to implement the desired functionality insulating automation incorporating this utility from potentially future improved support by Docker community members through dkrcp's interface.
