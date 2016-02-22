@@ -23,7 +23,160 @@ container_Clean(){
     fi
   fi
 }
-
+###########################################################################
+##
+##  Purpose:
+##    Given a set of Dockerfile metadata commands, ensure these commands
+##    affected the image's metadata values.
+##
+##  Input:
+##    $1 - An existing image name or UUID.
+##    $2 - Variable name to map relating a Dockerfile metadata command 
+##         to a value filter that can be expressed as a grep extended
+##         regular expression.  A successful filter causes grep to generate
+##         some output without failing.
+##    $3 - Variable name to a map defining the relationship between
+##         metadata command name and its associated json reference to the
+##         desired value. Command name must be all upper-case.
+##
+##  Output:
+##    When successful: nothing
+##    Otherwise: Error message to STDERR.
+##
+###########################################################################
+image_metadata_Verify(){
+  local -r imageNameUUID="$1"
+  local -r metaDataMap_ref="$2"
+  local -r metaDataFormat_ref="$3"
+  local imageMetaData
+  if ! imageMetaData="$( docker inspect --type=image -- $imageNameUUID )"; then
+    ScriptError "Image metadata not found for: '$imageNameUUID'."
+    return
+  fi
+  local -r imageMetaData
+  local jsonRef
+  local metaDataFilter
+  local metaDataFilterResult
+  eval local \-r metaDataCmdList=\"\$\{\!$metaDataMap_ref\[\@\]\}\"
+  for metaDataCmd in $metaDataCmdList
+  do
+    metaDataCmd="${metaDataCmd^^}"
+    AssociativeMapAssignIndirect "$metaDataMap_ref"    "$metaDataCmd" 'metaDataFilter'
+    AssociativeMapAssignIndirect "$metaDataFormat_ref" "$metaDataCmd" 'jsonRef'
+    if ! metaDataFilterResult="$( echo "$imageMetaData" | jq ".[0]$jsonRef" | grep -E "$metaDataFilter" )"; then
+      ScriptError "grep for metadata command: '$metaDataCmd' failed using filter: '$metaDataFilter'."
+      return
+    fi
+    if [ -z "$metaDataFilterResult" ]; then
+      ScriptError "Filter for metadata command: '$metaDataCmd' failed to find value using filter: '$metaDataFilter'."
+      return
+    fi 
+  done
+}
+###########################################################################
+##
+##  Purpose:
+##    Define the mapping between a docker commit image metadata command
+##    and the json reference to view its value.  Image metadata command
+##    must be in all uppercase.
+##
+##  Input:
+##    $1 - Variable name to map.
+##
+##  Output:
+##    $1 updated to reflect docker commit map.
+##
+###########################################################################
+docker_commit_metadata_cmd_to_jsonReference_Map(){
+  local -r metaDataFormat_ref="$1"
+  # initialize the map to nothing
+  eval $metaDataFormat_ref\=\(\)
+  # set the map to correlate commit metadata requests to
+  # their json references
+  _reflect_field_Set "$metaDataFormat_ref"  \
+    '--AUTHOR'    '.Author'                 \
+    '--MESSAGE'   '.Comment'                \
+    'CMD'         '.Config.Cmd'             \
+    'ENTRYPOINT'  '.Config.Entrypoint'      \
+    'ENV'         '.Config.Env'             \
+    'EXPOSE'      '.Config.ExposedPorts'    \
+    'LABEL'       '.Config.Labels'          \
+    'ONBUILD'     '.Config.OnBuild'         \
+    'USER'        '.Config.User'            \
+    'VOLUME'      '.Config.Volumes'         \
+    'WORKDIR'     '.Config.WorkingDir'
+}
+###########################################################################
+##
+##  Purpose:
+##    Extract only the docker commit options from the dkrcp provided option
+##    string.  Then extract the Docker metadata commands from the
+##    --change options and their values creating a result map associating
+##    these metadata commands with their values.
+##
+##  Input:
+##    $1 - One or more dkrcp options provided as a string.
+##    $2 - Variable name of map to return association between Dockerfile
+##         metadata commands and their values.
+##
+##  Output:
+##    $2 - Updated map.
+##
+###########################################################################
+docker_commit_metadata_cmd_value_Map(){
+  local -r optionString="$1"
+  local -r metadataValueMap_ref="$2"
+  eval $metadataValueMap_ref\=\(\)
+  local -a dkrOptList
+  eval set -- $optionString
+  while (( $# > 0 )); do
+   dkrOptList+=( "$1" )
+   shift
+  done
+  local -r dkrOptList
+  if (( ${#dkrOptList[@]} < 1 )); then return; fi
+  local -a dkrOptArgList
+  local -A dkrOptArgMap
+  local -a ucpOptRepeatList=( '--change' )
+  ucpOptRepeatList+=( '-c' )
+  local -r ucpOptRepeatList
+  if ! ArgumentsParse 'dkrOptList' 'dkrOptArgList' 'dkrOptArgMap' 'ucpOptRepeatList'; then
+    ScriptUnwind "$LINENO" "Unexpected error while processing option list: '$optionString'."
+  fi
+  # extract only image commit options from option string
+  local -r IMAGE_OPTION_FILTER='[[ $optArg =~ ^--change=[1-9][0-9]*$ ]] || [[ $optArg =~ ^-c=[1-9][0-9]*$ ]] || [ "$optArg" == "--author" ] || [ "$optArg" == "--message" ]'
+  local -a dkrCommitOptList
+  local -A dkrCommitOptMap
+  if ! OptionsArgsFilter 'dkrOptArgList' 'dkrOptArgMap' 'dkrCommitOptList' 'dkrCommitOptMap' "$IMAGE_OPTION_FILTER" 'true'; then
+    ScriptUnwind "$LINENO" "Problem filtering options for docker commit."
+  fi
+  local -r dkrCommitOptList
+  if (( ${#dkrCommitOptList[@]} < 1 )); then return; fi
+  local -r dkrCommitOptMap
+  # Dockerfile metadata commands follow form of <keyword><whitespace><value>
+  local -r regExDkrFileCmd='(^[^ ]+)[ ]+(.*)$'
+  local keyName
+  local innerKeyValue
+  for keyName in ${dkrCommitOptList[@]}
+  do
+    innerKeyValue="${dkrCommitOptMap["$keyName"]}"
+    if [ "$keyName" == '--author' ] || [ "$keyName" == '--message' ]; then
+      _reflect_field_Set "$metadataValueMap_ref" "${keyName^^}" "$innerKeyValue"
+      continue
+    fi
+    if ! [[ $innerKeyValue =~ $regExDkrFileCmd ]]; then
+      ScriptUnwind "$LINENO" "Parsing of Dockerfile command failed: '$innerKeyValue'."
+    fi
+    if [ "${BASH_REMATCH[1]^^}" == "LABEL" ]; then
+      # Special case for LABEL due to its json representation
+      _reflect_field_Set "$metadataValueMap_ref" "${BASH_REMATCH[1]^^}" "${BASH_REMATCH[2]/=/.+}"
+      continue
+    fi
+    #TODO: only one value for each distinct Dockerfile command survives (rightmost option).
+    # not currently necessary for testing to support multiple values.
+    _reflect_field_Set "$metadataValueMap_ref" "${BASH_REMATCH[1]^^}" "${BASH_REMATCH[2]}"
+  done
+}
 ###########################################################################
 ##
 ##  Purpose:
@@ -367,6 +520,9 @@ dkrcp_arg_interface(){
   ##    juncture, dkrcp has terminated and can no longer affect the environment.
   ##
   ##  Inputs:
+  ##    $1 - This pointer - associative map variable name of the type that 
+  ##         supports this interface.
+  ##    $2 - Options specified for the dkrcp command.
   ##    Environment, such as local Docker repository.
   ##
   ##  Outputs:
@@ -730,6 +886,22 @@ dkrcp_arg_image_no_exist_impl(){
     local -r imageName
     PipeFailCheck 'docker inspect --type=image --format='"'{{ .Id }}'"' -- '"$imageName"' | grep '"$dkrcpSTDOUT"' >/dev/null' "$LINENO" "Expected imageUUID: '$dkrcpSTDOUT' to correspond to image name: '$imageName'."
   }
+  dkrcp_arg_environ_Inspect(){
+    local -r this_ref="$1"
+    local dkrcptOpts="$2"
+    if [ -z "$dkrcptOpts" ]; then return; fi
+    local -A metadataCommitValueMap
+    docker_commit_metadata_cmd_value_Map "$dkrcptOpts" 'metadataCommitValueMap'
+    local -r metadataCommitValueMap
+    if (( ${#metadataCommitValueMap[@]} < 1 )); then return; fi
+    local -A metadataCommitJsonRefMap
+    docker_commit_metadata_cmd_to_jsonReference_Map 'metadataCommitJsonRefMap'
+    local -r metadataCommitValueMap
+    local imageName
+    _reflect_field_Get "$this_ref" 'ImageName' 'imageName'
+    local -r imageName
+    image_metadata_Verify "$imageName" 'metadataCommitValueMap' 'metadataCommitJsonRefMap'
+  }
   dkrcp_arg_Destroy(){
     local -r this_ref="$1"
     local imageName
@@ -958,6 +1130,75 @@ dkrcp_arg_container_exist_impl(){
   env_Check(){
     # derived from an image constructed by the same test, therefore, when this
     # image is removed so too will this container.
+    true
+  }
+}
+
+###########################################################################
+##
+##  Purpose:
+##    Implement interface for dkrcp arguments bound to tar stream.
+##  
+###########################################################################
+dkrcp_arg_stream_impl(){
+  dkrcp_arg_interface
+  _Create(){
+    local -r this_ref="$1"
+    local -r argFilePath="$2"
+    _reflect_type_Set "$this_ref" 'dkrcp_arg_stream_impl'
+    local resourceFilePath
+    resource_File_Path_Name_Prefix '' 'resourceFilePath'
+    _reflect_field_Set "$this_ref"           \
+      'ResourceFilePath' "$resourceFilePath" \
+      'ArgFilePath'      "$argFilePath"
+  }
+  dkrcp_arg_Get(){
+    ref_simple_value_Set '-' "$2"
+  }
+  dkrcp_arg_resource_Bind(){
+    true
+  }
+  dkrcp_arg_model_settings_Get(){
+    local -r this_ref="$1"
+    local -r argFileType_ref="$2"
+    local -r argFilePath_ref="$3"
+    local -r argFilePathExist_ref="$4"
+    ref_simple_value_Set "$argFileType_ref"      'd'
+    ref_simple_value_Set "$argFilePath_ref"      'stream'
+    ref_simple_value_Set "$argFilePathExist_ref" 'true'
+  }
+  dkrcp_arg_prequel_cmd_Gen(){
+    local -r this_ref="$1"
+    local resourceFilePath
+    local argFileSelector
+    _reflect_field_Get "$this_ref"          \
+      'ResourceFilePath' 'resourceFilePath' \
+      'ArgFilePath'      'argFilePath'
+    local -r resourceFilePath
+    local -r argFilePath
+    ref_simple_value_Set "$2" 'tar -C '"'${resourceFilePath}'"' -cf- '"'${argFilePath}'"
+  }
+  dkrcp_arg_model_Write(){
+    local -r this_ref="$1"
+    local -r modelPath="$2"
+    local tarCommand
+    dkrcp_arg_prequel_cmd_Gen "$this_ref" 'tarCommand'
+    PipeFailCheck "$tarCommand"' | tar -C '"'$modelPath'"' -xf-' "$LINENO" "Failure when writing stream to model path:'$ModelPath'."
+  }
+  dkrcp_arg_Destroy(){
+    true
+  }
+  env_clean_interface
+  env_Clean(){
+    # derived from host file constructed by the same test and 
+    # since it streams, it doesn't allocate resources that
+    # need to be released.
+    true
+  }
+  env_check_interface
+  env_Check(){
+    # derived from host file constructed by the same test, therefore,
+    # this object will perform this method.
     true
   }
 }
@@ -1274,7 +1515,7 @@ test_element_impl(){
         # output inspection detected an unexpected problem terminate testing
         exit 1
       fi
-      if ! dkrcp_arg_environ_Inspect "$testTargetArg_ref"; then
+      if ! dkrcp_arg_environ_Inspect "$testTargetArg_ref" "$dkrcpCmdOptions"; then
         # environment inspection detected an unexpected problem - terminate testing
         exit 1
       fi
@@ -2057,7 +2298,9 @@ dkrcp_test_21(){
     test_element_cmd_options_Get(){
       local options="--change 'EXPOSE 6767' --change 'ENV envVar=value' --change 'LABEL test_21_label=label_value'"
       options+=" --change 'USER test_21_user' --change 'ENTRYPOINT [\"executable\", \"parm1\"]'"
-      options+=" --message 'message for test_21' --author 'author for test_21'"
+      options+=" --change 'ONBUILD COPY /a /b' --change  'VOLUME /var/log' --change 'WORKDIR /dev/pts/'"
+      options+=" --change 'ONBUILD COPY /a /b' --change  'VOLUME /var/log' --change 'WORKDIR /dev/pts/'"
+      options+=" --change 'CMD [\"param1\", \"param2\"]' "
       ref_simple_value_Set "$1" "$options"
     }
   }
