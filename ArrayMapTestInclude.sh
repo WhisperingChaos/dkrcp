@@ -69,7 +69,6 @@ function AssociativeMapToBuffer () {
   else
     eval $outputBufferNm\=\$buffer
   fi
-  return 0;
 }
 ##############################################################################
 ##
@@ -351,7 +350,6 @@ function AssociativeMapAssignIndirect () {
   else
     eval echo \"\$\{$associativeMapToTestNm\[\"\$keyValue\"]\}\"
   fi
-  return 0; 
 }
 ###############################################################################
 ##
@@ -464,7 +462,6 @@ function ArrayMapAssertElementCount () {
     ScriptUnwind $lineNumOfAssert "Array size:'$arraySize' not equal to expected size of: '$arrayElementCount' for array name: '$arrayMapToTestNm'."
     exit 1
   fi
-  return 0
 }
 FunctionOverrideIncludeGet
 ###############################################################################
