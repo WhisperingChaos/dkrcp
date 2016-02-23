@@ -1133,7 +1133,6 @@ dkrcp_arg_container_exist_impl(){
     true
   }
 }
-
 ###########################################################################
 ##
 ##  Purpose:
@@ -1153,9 +1152,11 @@ dkrcp_arg_stream_impl(){
       'ArgFilePath'      "$argFilePath"
   }
   dkrcp_arg_Get(){
-    ref_simple_value_Set '-' "$2"
+    ref_simple_value_Set "$2" '-'
   }
   dkrcp_arg_resource_Bind(){
+    #  bind occurs to lower level resources and there's nothing
+    #  at this level to bind.
     true
   }
   dkrcp_arg_model_settings_Get(){
@@ -1170,7 +1171,7 @@ dkrcp_arg_stream_impl(){
   dkrcp_arg_prequel_cmd_Gen(){
     local -r this_ref="$1"
     local resourceFilePath
-    local argFileSelector
+    local argFilePath
     _reflect_field_Get "$this_ref"          \
       'ResourceFilePath' 'resourceFilePath' \
       'ArgFilePath'      'argFilePath'
@@ -2310,5 +2311,28 @@ dkrcp_test_21(){
          "Specify all docker commit variables and ensure these variables are"     \
          "set to these values.  Outcome: Image should exist with the appropriate" \
          "docker commit option values created in its metadata"
+  }
+}
+###############################################################################
+dkrcp_test_22(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_stream_impl'                         'stream' 'a' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_a'      'f'  '/a'              'file_content_reflect_name' "
+      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTarget' 'd'  'dev/pts/'       'true'  'test_22_target' "
+      echo " 'audit_model_impl'                              'modelExpected'        'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'          'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'stream' )
+      testDependArgList=( 'hostFile_a' )
+      testTargetArg_ref='imageNameTarget'
+    }
+  }
+  test_element_test_1_imp
+  dkrcp_test_Desc(){
+    echo "Create an image by tar streaming a file to an existing image directory. "   \
+         " Outcome: Image should exist with a single file in the targeted directory."
   }
 }
