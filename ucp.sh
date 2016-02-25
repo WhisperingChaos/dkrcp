@@ -8,7 +8,7 @@ ref_simple_value_Set(){
 }
 #TODO: Add Digest support.
 #TODO: remove ScriptDebug messages.
-#TODO: support import as a mechanism --upc-import
+#TODO: support import as a mechanism to create images --upc-import
 #TODO: convert to more standard oo implementation
 ##############################################################################
 ##
@@ -1120,7 +1120,8 @@ cp_complex(){
   # unable to stream, convert into two simpler docker cp commands.
   # doing so requires temporarily copying the source then deleting
   # the copy.
-  local    tmpHostRefTarget="$HOST_FILE_ROOT/$$/$sourceArgDocker"
+  local -r tmpHostRefRoot="$HOST_FILE_ROOT/$$"
+  local    tmpHostRefTarget="$tmpHostRefRoot/$sourceArgDocker"
   local -r tmpHostRefSource="$tmpHostRefTarget"
   if [ "${sourceArgDocker:${#sourceArgDocker}-2}" == '/.' ]; then
     tmpHostRefTarget="${tmpHostRefTarget:0:-2}"
@@ -1136,8 +1137,8 @@ cp_complex(){
   if ! docker cp "$tmpHostRefSource" "$targetArgDocker">/dev/null; then
     ScriptUnwind "$LINENO" "docker cp '$tmpHostRefSource', '$targetArgDocker'."
   fi
-  if ! rm -rf "$tmpHostRefTarget">/dev/null; then
-    ScriptUnwind "$LINENO" "rm failed for: '$tmpHostRefTarget'."
+  if ! rm -rf "$tmpHostRefRoot">/dev/null; then
+    ScriptUnwind "$LINENO" "rm failed for: '$tmpHostRefRoot'."
   fi
 }
 #TODO: if not necessary, remove
