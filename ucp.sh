@@ -26,7 +26,6 @@ function VirtCmmdArgumentsParse () {
   ucpOptRepeatList+=( '-c' )
   ArgumentsParse "$1" "$2" "$3" 'ucpOptRepeatList' 'Argument'
 }
-
 VirtCmmdConfigSetDefault () {
   REG_EX_UUID='^[a-fA-F0-9]+'
   REG_EX_REPOSITORY_NAME_UUID='^([a-z0-9]([._-]?[a-z0-9]+)*/)*[a-z0-9]([._-]?[a-z0-9]+)*(:[A-Za-z0-9._-]*)?'
@@ -1131,15 +1130,21 @@ cp_complex(){
   if ! mkdir -p "$( dirname "$tmpHostRefTarget" )">/dev/null; then
     ScriptUnwind "$LINENO" "rm failed for: '$tmpHostRefTarget'."
   fi
-  if ! eval docker cp $dockerCpOpts \"\$sourceArgDocker\" \"\$tmpHostRefTarget\">/dev/null; then
-    ScriptUnwind "$LINENO" "docker cp '$sourceArgDocker', '$tmpHostRefTarget'."
-  fi
-  if ! docker cp "$tmpHostRefSource" "$targetArgDocker">/dev/null; then
-    ScriptUnwind "$LINENO" "docker cp '$tmpHostRefSource', '$targetArgDocker'."
-  fi
+  local successCopy='false'
+  while true; do
+    if ! eval docker cp $dockerCpOpts \"\$sourceArgDocker\" \"\$tmpHostRefTarget\"\>\/dev\/null; then
+      break
+    fi
+    if ! docker cp "$tmpHostRefSource" "$targetArgDocker">/dev/null; then
+      break
+    fi
+    successCopy='true'
+    break
+  done
   if ! rm -rf "$tmpHostRefRoot">/dev/null; then
     ScriptUnwind "$LINENO" "rm failed for: '$tmpHostRefRoot'."
   fi
+  successCopy;
 }
 #TODO: if not necessary, remove
 #cp_strategy_failure_Mess(){
