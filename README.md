@@ -48,10 +48,10 @@ However, the following tabular form offers an equivalent description of copy beh
 |         | SOURCE File  | SOURCE Directory | [SOURCE Directory Content](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#source-directory-content-an-existing-directory-path-appended-with-) | SOURCE Stream |
 | :--:    | :----------: | :---------------:| :---------------: | :-------: |
 | **TARGET exists as file.** | Overlay TARGET with SOURCE content. | Error |Error | Error |
-| **TARGET name does not exist but its parent directory does.** | File name assumed. Copy SOURCE contents to name.| Directory name assumed. Create TARGET Directory with name and copy SOURCE "content" to it. | Identical behavior to adjacent left hand cell. | Error |
+| **TARGET name does not exist but its parent directory does.** | TARGET File name assumed. Copy SOURCE contents to TARGET name.| TARGET directory name assumed. Create TARGET directory. Copy SOURCE content to TARGET.. | Identical behavior to adjacent left hand cell. | Error |
 | **TARGET name does not exist, nor does its parent directory.** | Error | Error | Error | Error|
-| **TARGET exists as directory.** | SOURCE copied to TARGET. | SOURCE copied to TARGET. | SOURCE content copied to TARGET. | File/Directory copied to TARGET. |
-| **[TARGET assumed directory](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#target-assumed-directory-the-rightmost-last-name-of-a-specified-path-suffixed-by---it-is-assumed-to-reference-an-existing-directory) but doesn't exist.** | Error | SOURCE copied to TARGET | SOURCE "content" copied to TARGET | Error |
+| **TARGET exists as directory.** | Copy SOURCE to TARGET. | Copy SOURCE to TARGET. | Copy SOURCE content to TARGET. | Copy File/Directory copied TARGET. |
+| **[TARGET assumed directory](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#target-assumed-directory-the-rightmost-last-name-of-a-specified-path-suffixed-by---it-is-assumed-to-reference-an-existing-directory) but doesn't exist.** | Error | Copy SOURCE to TARGET. | Copy SOURCE content to TARGET. | Error |
 
 ######TARGET assumed directory: The rightmost, last, name of a specified [path](https://en.wikipedia.org/wiki/Path_%28computing%29) suffixed by '/'.  It is assumed to reference an existing directory.
 
