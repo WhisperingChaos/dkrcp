@@ -55,7 +55,7 @@ However, the following tabular form offers an equivalent description of copy beh
 
 ######TARGET assumed directory: The rightmost, last, name of a specified [path](https://en.wikipedia.org/wiki/Path_%28computing%29) suffixed by '/' - indidicative of a directory.
 
-######SOURCE Directory Content: An existing directory path appended with '/.'
+######SOURCE Directory Content: An existing directory path appended with '/.'.
 
 The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it a file, directory, or stream is successfully copied, as long as the TARGET refers to a preexisting directory, otherwise, the operation fails.  
 
