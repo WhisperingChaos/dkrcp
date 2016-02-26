@@ -50,8 +50,8 @@ However, the following tabular form offers an equivalent description of copy beh
 | **TARGET exists as file.** | Overlay TARGET with SOURCE content. | Error |Error | Error |
 | **TARGET name does not exist but its parent directory does.** | File name assumed. Copy SOURCE contents to name.| Directory name assumed. Create TARGET Directory with name and copy SOURCE "content" to it. | Identical behavior to adjacent left hand cell. | Error |
 | **TARGET name does not exist, nor does its parent directory.** | Error | Error | Error | Error|
-| **TARGET exists as directory.** | Copied to TARGET. | Copied to TARGET. | SOURCE content copied to TARGET. | File/Directory copied to TARGET. |
-| **[TARGET assumed directory](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#target-assumed-directory-the-rightmost-last-name-of-a-specified-path-suffixed-by---it-is-assumed-to-reference-an-existing-directory) but doesn't exist.** | Error | Error | Error | Error |
+| **TARGET exists as directory.** | SOURCE copied to TARGET. | SOURCE copied to TARGET. | SOURCE content copied to TARGET. | File/Directory copied to TARGET. |
+| **[TARGET assumed directory](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#target-assumed-directory-the-rightmost-last-name-of-a-specified-path-suffixed-by---it-is-assumed-to-reference-an-existing-directory) but doesn't exist.** | Error | SOURCE copied to TARGET | SOURCE "content" copied to TARGET | Error |
 
 ######TARGET assumed directory: The rightmost, last, name of a specified [path](https://en.wikipedia.org/wiki/Path_%28computing%29) suffixed by '/'.  It is assumed to reference an existing directory.
 
