@@ -60,14 +60,14 @@ However, the following tabular form offers an equivalent description of copy beh
 The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it a file, directory, or stream is successfully copied, as long as the TARGET refers to a preexisting directory, otherwise, the operation fails.  
 
 ##### Images as SOURCE/TARGET
-A double colon '```::```' delimiter classifies the file path as referring to an image, differenciating it from the single one denoting a container reference.  Therefore, an argument referencing an image involving a tag would appear similar to: '```image_name:image_tag::etc/hostname```'.
+A double colon '```::```' delimiter classifies the file path as referring to an image, differenciating it from the single one denoting a container reference.  Therefore, an argument referencing an image involving a tag would appear similar to: '```repository_name:tag::etc/hostname```'.
 
-######Copying *from* an *existing image*:
+######Copy *from* an *existing image*:
   * Convert the referenced image to a container via [```docker create```](https://docs.docker.com/engine/reference/commandline/create).
   * Copy from this container using ```docker cp```.
   * ```dkrcp``` destroys this container using ```docker rm```.
 
-######Copying *to* an *existing image*:
+######Copy *to* an *existing image*:
   * Convert the referenced image to a container via ```docker create```.
   * Copy to this container using ```docker cp```.
   * If copy succeeds, ```dkrcp``` converts this container's state to an image using ```docker commit```.  
@@ -75,7 +75,10 @@ A double colon '```::```' delimiter classifies the file path as referring to an 
     * When processing multiple SOURCE arguments, ```dkrcp``` delays the commit until after iterating over all of them.
   * If copy fails, ```dkrcp``` bypasses the commit.
   * ```dkrcp``` destroys this container using ```docker rm```.
-  
+
+######Copy *to create* an *image*:
+  * Execute a ```docker build``` using ```FROM scratch```
+  * 
 
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
