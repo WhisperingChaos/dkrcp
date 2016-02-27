@@ -78,7 +78,7 @@ A double colon '```::```' delimiter classifies the file path as referring to an 
 
 ######Copy *to create* an *image*:
   * Execute a ```docker build``` using ```FROM scratch```
-  * Continue with [Copy *to* an *existing image*](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#copy-to-create-an-image).
+  * Continue with [Copy *to* an *existing image*](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#copy-to-an-existing-image).
 
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
