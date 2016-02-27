@@ -46,23 +46,39 @@ are all applicable to ```dkrcp```.
 However, the following tabular form offers an equivalent description of copy behavior but visually different than the documention associated to ```docker cp```.
 
 |         | SOURCE File  | SOURCE Directory | [SOURCE Directory Content](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#source-directory-content-an-existing-directory-path-appended-with-) | SOURCE Stream |
-| :--:    | :----------: | :---------------:| :---------------: | :-------: |
-| **TARGET exists as file.** | Overlay TARGET with SOURCE content. | Error |Error | Error |
-| **TARGET name does not exist but its parent directory does.** | File name assumed. Copy SOURCE contents to name.| Directory name assumed. Create TARGET Directory with name and copy SOURCE "content" to it. | Identical behavior to adjacent left hand cell. | Error |
+| :--:    | :----------: | :---------:| :----------: | :----------: |
+| **TARGET exists as file.** | Copy SOURCE content to TARGET. | Error |Error | Error |
+| **TARGET name does not exist but its parent directory does.** | TARGET File name assumed. Copy SOURCE content to TARGET.| TARGET directory name assumed. Create TARGET directory. Copy SOURCE content to TARGET. | Identical behavior to adjacent left hand cell. | Error |
 | **TARGET name does not exist, nor does its parent directory.** | Error | Error | Error | Error|
-| **TARGET exists as directory.** | Copied to TARGET. | Copied to TARGET. | SOURCE content copied to TARGET. | File/Directory copied to TARGET. |
-| **[TARGET assumed directory](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#target-assumed-directory-the-rightmost-last-name-of-a-specified-path-suffixed-by---it-is-assumed-to-reference-an-existing-directory) but doesn't exist.** | Error | Error | Error | Error |
+| **TARGET exists as directory.** | Copy SOURCE to TARGET. | Copy SOURCE to TARGET. | Copy SOURCE content to TARGET. | Copy File/Directory to TARGET. |
+| **[TARGET assumed directory](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#target-assumed-directory-the-rightmost-last-name-of-a-specified-path-suffixed-by---it-is-assumed-to-reference-an-existing-directory) doesn't exist but its parent directory does.** | Error | Copy SOURCE content to TARGET. | Copy SOURCE content to TARGET. | Error |
 
-######TARGET assumed directory: The rightmost, last, name of a specified [path](https://en.wikipedia.org/wiki/Path_%28computing%29) suffixed by '/'.  It is assumed to reference an existing directory.
+######TARGET assumed directory: The rightmost, last, name of a specified [path](https://en.wikipedia.org/wiki/Path_%28computing%29) suffixed by '/' - indicative of a directory.
 
-######SOURCE Directory Content: An existing directory path appended with '/.'
+######SOURCE Directory Content: An existing directory path appended with '/.'.
 
 The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it a file, directory, or stream is successfully copied, as long as the TARGET refers to a preexisting directory, otherwise, the operation fails.  
 
 ##### Images as SOURCE/TARGET
-A double colon '::' delimiter classifies the file path as referring to an image, differenciating it from the single one denoting a container reference.  Therefore, an argument referencing an image involving a tag would appear similar to '```image_name:image_tag::etc/hostname```'.
+A double colon '```::```' delimiter classifies the file path as referring to an image, differenciating it from the single one denoting a container reference.  Therefore, an argument referencing an image involving a tag would appear similar to: '```repository_name:tag::etc/hostname```'.
 
-Copying from/to an existing image involves the creation [(```docker create```)](https://docs.docker.com/engine/reference/commandline/create) of a container.  Container creation occurs even when the image lacks a defined entrypont, as a 'null' entrypoint hack is applied to subvert ```docker create``` insistance that one exist.  After successful container construction, ```dkrcp``` adapts the image copy process using the temporary container as SOURCE/TARGET argument for the  read/update this temporary container.  Once the operation completes, either successfully or otherwise, the temporary container(s) are removed.   
+######Copy *from* an *existing image*:
+  * Convert the referenced image to a container via [```docker create```](https://docs.docker.com/engine/reference/commandline/create).
+  * Copy from this container using ```docker cp```.
+  * ```dkrcp``` destroys this container using ```docker rm```.
+
+######Copy *to* an *existing image*:
+  * Convert the referenced image to a container via ```docker create```.
+  * Copy to this container using ```docker cp```.
+  * If copy succeeds, ```dkrcp``` converts this container's state to an image using ```docker commit```.  
+    * Specifying an image name as a TARGET argument propagates this name to ```docker commit``` superseding the originally named image.
+    * When processing multiple SOURCE arguments, ```dkrcp``` delays the commit until after iterating over all of them.
+  * If copy fails, ```dkrcp``` bypasses the commit.
+  * ```dkrcp``` destroys this container using ```docker rm```.
+
+######Copy *to create* an *image*:
+  * Execute a ```docker build``` using ```FROM scratch```
+  * Continue with [Copy *to* an *existing image*](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#copy-to-an-existing-image).
 
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
