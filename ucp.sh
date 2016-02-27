@@ -215,7 +215,7 @@ VirtCmmdExecute(){
     source_obj_docker_arg_Get 'argSourceObj' 'sourceReference'
     local -r sourceReference
     # execute in a sub-shell in order to cleanup from copy exceptions  
-    if ! $( cp_strategy_Exec "$dockerCpOpts" "$argSourceType" "$sourceReference" "$argTargetType" "$targetReference" ); then
+    if ! ( cp_strategy_Exec "$dockerCpOpts" "$argSourceType" "$sourceReference" "$argTargetType" "$targetReference"; ); then
       #TODO: remove
       #cp_strategy_failure_Mess 'argSourceObj' 'argTargetObj'
       source_obj_Release 'argSourceObj'
@@ -1066,7 +1066,7 @@ cp_simple(){
   local -r dockerCpOpts="$1"
   local -r sourceArgDocker="$2"
   local -r targetArgDocker="$3"
-  eval docker cp $dockerCpOpts \"\$sourceArgDocker\" \"\$targetArgDocker\" \>\/dev\/null
+  eval docker cp $dockerCpOpts \"\$sourceArgDocker\" \"\$targetArgDocker\"
 }
 ##############################################################################
 ##
@@ -1135,7 +1135,7 @@ cp_complex(){
     if ! eval docker cp $dockerCpOpts \"\$sourceArgDocker\" \"\$tmpHostRefTarget\"\>\/dev\/null; then
       break
     fi
-    if ! docker cp "$tmpHostRefSource" "$targetArgDocker">/dev/null; then
+    if ! docker cp "$tmpHostRefSource" "$targetArgDocker"; then
       break
     fi
     successCopy='true'
@@ -1144,7 +1144,7 @@ cp_complex(){
   if ! rm -rf "$tmpHostRefRoot">/dev/null; then
     ScriptUnwind "$LINENO" "rm failed for: '$tmpHostRefRoot'."
   fi
-  successCopy;
+  $successCopy;
 }
 #TODO: if not necessary, remove
 #cp_strategy_failure_Mess(){
