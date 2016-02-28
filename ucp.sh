@@ -77,10 +77,10 @@ OPTIONS:
     --ucpchk-reg=false        Don't pull images from registry. Limits image name
                                 resolution to Docker local repository for  
                                 both SOURCE and TARGET names.
-    --author="",-a            Specify maintainer when target is an image.
+    --author="",-a            Specify maintainer when TARGET is an image.
     --change[],-c             Apply specified Dockerfile instruction(s) when
-                                target is an image. see 'docker commit'
-    --message="",-m           Apply commit message when target is an image.
+                                TARGET is an image. see 'docker commit'
+    --message="",-m           Apply commit message when TARGET is an image.
     --help=false,-h           Don't display this help message.
     --version=false           Don't display version info.
 
