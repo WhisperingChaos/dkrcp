@@ -1042,6 +1042,40 @@ dkrcp_arg_image_exist_impl(){
     # derived from a non-existent image
     true
   }
+}
+###########################################################################
+##
+##  Purpose:
+##    Implement interface for dkrcp arguments bound a remote image.
+##
+###########################################################################
+dkrcp_arg_image_remote(){
+  dkrcp_arg_image_no_exist_impl
+  ###########################################################################
+  ##
+  ##  Purpose:
+  ##    Factory function to construct an dkrcp image name argument that
+  ##    that references a remote image.
+  ##
+  ##  Inputs:
+  ##    $1 - An 'empty' associative map variable.
+  ##    $2 - The type of image file path:
+  ##         'f' - file path resolves to a file.
+  ##         'd' - file path resolves to a directory.
+  ##    $3 - dkrcp image file path.
+  ##    $4 - file path exists
+  ##    $5 - Image name.
+  ##
+  ##  Outputs:
+  ##    $1 - A constructed this pointer.
+  ##
+  ###########################################################################
+  _Create(){
+    # temporarily disable test name space to prevent corruption of remote
+    # image name.
+    local -r TEST_NAME_SPACE=''
+    dkrcp_arg_image_or_container_Create 'dkrcp_arg_image_remote' "${@}"
+  }
 }  
 dkrcp_arg_container_exist_impl(){
   dkrcp_arg_interface
@@ -1606,7 +1640,7 @@ test_element_impl(){
       _test_element_model_expected_Create
       _test_element_model_result_Create
       _test_element_models_Compare
-      #sleep 30
+      sleep 30
     fi
   }
 }
@@ -2694,10 +2728,10 @@ dkrcp_test_31(){
   test_element_test_2_imp(){
     test_element_interface
     test_element_member_Def(){
-      echo " 'dkrcp_arg_container_exist_impl'                'containerSource'  'd' '/dir_a'        'true' 'test_31_source' "
-      echo " 'dkrcp_arg_image_no_exist_target_bad_impl'      'imageNameTarget'  'f' '/etc/hostname' 'true' 'test_31_target'  'cannot.copy.directory' "
-      echo " 'audit_model_impl'                              'modelExpected'    'modelexpected_2' "
-      echo " 'audit_model_impl'                              'modelResult'      'modelresult_2' "
+      echo " 'dkrcp_arg_container_exist_impl'     'containerSource'  'd' '/dir_a'        'true'  'test_31_source' "
+      echo " 'dkrcp_arg_image_no_exist_impl'      'imageNameTarget'  'f' 'noexist/'      'false' 'test_31_target' "
+      echo " 'audit_model_impl'                   'modelExpected'    'modelexpected_2' "
+      echo " 'audit_model_impl'                   'modelResult'      'modelresult_2' "
     }
     test_element_args_Catgry(){
       testSourceArgList=( 'containerSource' )
@@ -2710,9 +2744,11 @@ dkrcp_test_31(){
   }
   test_element_test_2_imp
   dkrcp_test_Desc(){
-    echo "Attempt to create an image by copying the existing contents of a"   \
-         "container's directory into the image. The target is a preexisting"  \
-         "file.  Outcome image removed due to rollback initaited by failure."
+    echo "Create an image by copying the existing contents of a"              \
+         "container's directory into it. The target directory doesn't"        \
+         "exist but has been designated as one using trailing '/'.  Outcome" \
+         "image created and contents of the source container are copied to"   \
+         "the newly created target directory."
   }
 }
 ###############################################################################
@@ -2739,8 +2775,100 @@ dkrcp_test_32(){
   test_element_test_2_imp(){
     test_element_interface
     test_element_member_Def(){
-      echo " 'dkrcp_arg_container_exist_impl'                'containerSource'  'd' '/dir_a'          'true' 'test_32_source' "
-      echo " 'dkrcp_arg_image_no_exist_target_bad_impl'      'imageNameTarget'  'f' 'noexist/noexist' 'false' 'test_32_target'  'no.such.file.or.directory' "
+      echo " 'dkrcp_arg_container_exist_impl'                'containerSource'  'd' '/dir_a/.'   'true'  'test_32_source' "
+      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTarget'  'd' 'noexists/'  'false' 'test_32_target' "
+      echo " 'audit_model_impl'                              'modelExpected'    'modelexpected_2' "
+      echo " 'audit_model_impl'                              'modelResult'      'modelresult_2' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'containerSource' )
+      testTargetArg_ref='imageNameTarget'
+    }
+    test_element_prequisite_test_Def(){
+      echo 'test_element_test_1_imp'
+      echo 'test_element_test_2_imp'
+    }
+  }
+  test_element_test_2_imp
+  dkrcp_test_Desc(){
+    echo "Create an image by copying the existing contents of a container's" \
+          "directory into the image. The target directory does not exists"   \
+          "it is an assumed directory due to trailing '/'.  Outcome"          \
+          "new image with source container directory contents located in"    \
+          "target directory."
+  }
+}
+###############################################################################
+dkrcp_test_33(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_a'    'd' 'dir_a'     'file_content_dir_create'  "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_a'  'f' 'dir_a/a'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_b'  'f' 'dir_a/b'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_c'  'f' 'dir_a/c'   'file_content_reflect_name' "
+      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTarget'   'd' 'dir_a'  'false' 'test_33_source' "
+      echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=(  'hostFile_dir_a' )
+      testDependArgList=(  'hostFile_dir_a_a' )
+      testDependArgList+=( 'hostFile_dir_a_b' )
+      testDependArgList+=( 'hostFile_dir_a_c' )
+      testTargetArg_ref='imageNameTarget'
+    }
+  }
+  test_element_test_2_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_container_exist_impl'                'containerSource'  'd' '/dir_a'        'true' 'test_33_source' "
+      echo " 'dkrcp_arg_image_no_exist_target_bad_impl'      'imageNameTarget'  'f' '/etc/hostname' 'true' 'test_33_target'  'cannot.copy.directory' "
+      echo " 'audit_model_impl'                              'modelExpected'    'modelexpected_2' "
+      echo " 'audit_model_impl'                              'modelResult'      'modelresult_2' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'containerSource' )
+      testTargetArg_ref='imageNameTarget'
+    }
+    test_element_prequisite_test_Def(){
+      echo 'test_element_test_1_imp'
+      echo 'test_element_test_2_imp'
+    }
+  }
+  test_element_test_2_imp
+  dkrcp_test_Desc(){
+    echo "Attempt to create an image by copying the existing contents of a"   \
+         "container's directory into the image. The target is a preexisting"  \
+         "file.  Outcome image removed due to rollback initaited by failure."
+  }
+}
+###############################################################################
+dkrcp_test_34(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_a'    'd' 'dir_a'     'file_content_dir_create'  "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_a'  'f' 'dir_a/a'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_b'  'f' 'dir_a/b'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_c'  'f' 'dir_a/c'   'file_content_reflect_name' "
+      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTarget'   'd' 'dir_a'  'false' 'test_34_source' "
+      echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=(  'hostFile_dir_a' )
+      testDependArgList=(  'hostFile_dir_a_a' )
+      testDependArgList+=( 'hostFile_dir_a_b' )
+      testDependArgList+=( 'hostFile_dir_a_c' )
+      testTargetArg_ref='imageNameTarget'
+    }
+  }
+  test_element_test_2_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_container_exist_impl'                'containerSource'  'd' '/dir_a'          'true' 'test_34_source' "
+      echo " 'dkrcp_arg_image_no_exist_target_bad_impl'      'imageNameTarget'  'f' 'noexist/noexist' 'false' 'test_34_target'  'no.such.file.or.directory' "
       echo " 'audit_model_impl'                              'modelExpected'    'modelexpected_2' "
       echo " 'audit_model_impl'                              'modelResult'      'modelresult_2' "
     }
@@ -2759,5 +2887,301 @@ dkrcp_test_32(){
          "container's directory into the image. The target directory doesn't" \
          "exist, nor does its parent.  Outcome image removed due to rollback" \
          "initaited by failure."
+  }
+}
+###############################################################################
+dkrcp_test_35(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_a'    'd' 'dir_a'     'file_content_dir_create'  "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_a'  'f' 'dir_a/a'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_b'  'f' 'dir_a/b'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_c'  'f' 'dir_a/c'   'file_content_reflect_name' "
+      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTarget'   'd' 'dir_a'  'false' 'test_35_source' "
+      echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=(  'hostFile_dir_a' )
+      testDependArgList=(  'hostFile_dir_a_a' )
+      testDependArgList+=( 'hostFile_dir_a_b' )
+      testDependArgList+=( 'hostFile_dir_a_c' )
+      testTargetArg_ref='imageNameTarget'
+    }
+  }
+  test_element_test_2_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_container_exist_impl'                'containerSource'  'd' '/dir_a/.'          'true' 'test_35_source' "
+      echo " 'dkrcp_arg_image_no_exist_target_bad_impl'      'imageNameTarget'  'f' 'noexist/noexist' 'false' 'test_35_target'  'no.such.file.or.directory' "
+      echo " 'audit_model_impl'                              'modelExpected'    'modelexpected_2' "
+      echo " 'audit_model_impl'                              'modelResult'      'modelresult_2' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'containerSource' )
+      testTargetArg_ref='imageNameTarget'
+    }
+    test_element_prequisite_test_Def(){
+      echo 'test_element_test_1_imp'
+      echo 'test_element_test_2_imp'
+    }
+  }
+  test_element_test_2_imp
+  dkrcp_test_Desc(){
+    echo "Attempt to create an image by copying the existing contents of a"   \
+         "container's directory into the image. The target directory doesn't" \
+         "exist, nor does its parent.  Outcome image removed due to rollback" \
+         "initaited by failure."
+  }
+}
+###############################################################################
+dkrcp_test_36(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_a'    'd' 'dir_a'     'file_content_dir_create'  "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_a'  'f' 'dir_a/a'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_b'  'f' 'dir_a/b'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_c'  'f' 'dir_a/c'   'file_content_reflect_name' "
+      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTarget'   'd' 'dir_a'  'false' 'test_36_source' "
+      echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=(  'hostFile_dir_a' )
+      testDependArgList=(  'hostFile_dir_a_a' )
+      testDependArgList+=( 'hostFile_dir_a_b' )
+      testDependArgList+=( 'hostFile_dir_a_c' )
+      testTargetArg_ref='imageNameTarget'
+    }
+  }
+  test_element_test_2_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_container_exist_impl'                'containerSource'  'd' '/dir_a/.'        'true' 'test_36_source' "
+      echo " 'dkrcp_arg_image_no_exist_target_bad_impl'      'imageNameTarget'  'f' '/etc/hostname' 'true' 'test_36_target'  'cannot.copy.directory' "
+      echo " 'audit_model_impl'                              'modelExpected'    'modelexpected_2' "
+      echo " 'audit_model_impl'                              'modelResult'      'modelresult_2' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'containerSource' )
+      testTargetArg_ref='imageNameTarget'
+    }
+    test_element_prequisite_test_Def(){
+      echo 'test_element_test_1_imp'
+      echo 'test_element_test_2_imp'
+    }
+  }
+  test_element_test_2_imp
+  dkrcp_test_Desc(){
+    echo "Attempt to create an image by copying the existing contents of a"   \
+         "container's directory into the image. The target is a preexisting"  \
+         "file.  Outcome image removed due to rollback initaited by failure."
+  }
+}
+###############################################################################
+dkrcp_test_37(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_a'    'd' 'dir_a'     'file_content_dir_create'  "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_a'  'f' 'dir_a/a'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_b'  'f' 'dir_a/b'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_c'  'f' 'dir_a/c'   'file_content_reflect_name' "
+      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTarget'   'd' 'dir_a'  'false' 'test_37_source' "
+      echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=(  'hostFile_dir_a' )
+      testDependArgList=(  'hostFile_dir_a_a' )
+      testDependArgList+=( 'hostFile_dir_a_b' )
+      testDependArgList+=( 'hostFile_dir_a_c' )
+      testTargetArg_ref='imageNameTarget'
+    }
+  }
+  test_element_test_2_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_container_exist_impl'                'containerSource'  'f' '/dir_a/a'    'true' 'test_37_source' "
+      echo " 'dkrcp_arg_image_no_exist_target_bad_impl'      'imageNameTarget'  'f' '/noexist/a'  'false' 'test_37_target'  'no.such.file.or.directory' "
+      echo " 'audit_model_impl'                              'modelExpected'    'modelexpected_2' "
+      echo " 'audit_model_impl'                              'modelResult'      'modelresult_2' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'containerSource' )
+      testTargetArg_ref='imageNameTarget'
+    }
+    test_element_prequisite_test_Def(){
+      echo 'test_element_test_1_imp'
+      echo 'test_element_test_2_imp'
+    }
+  }
+  test_element_test_2_imp
+  dkrcp_test_Desc(){
+    echo "Attempt to create an image by copying the existing a container's"    \
+         "file into the image. The target refers to a name that doesn't exist" \
+         "nor does its parent directory.  Outcome image removed due to"        \
+         "rollback initaited by failure."
+  }
+}
+###############################################################################
+dkrcp_test_38(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_a'    'd' 'dir_a'     'file_content_dir_create'  "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_a'  'f' 'dir_a/a'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_b'  'f' 'dir_a/b'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_c'  'f' 'dir_a/c'   'file_content_reflect_name' "
+      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTarget'   'd' 'dir_a'  'false' 'test_38_source' "
+      echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=(  'hostFile_dir_a' )
+      testDependArgList=(  'hostFile_dir_a_a' )
+      testDependArgList+=( 'hostFile_dir_a_b' )
+      testDependArgList+=( 'hostFile_dir_a_c' )
+      testTargetArg_ref='imageNameTarget'
+    }
+  }
+  test_element_test_2_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_container_exist_impl'     'containerSource'  'd' '/dir_a/.'   'true'  'test_38_source' "
+      echo " 'dkrcp_arg_image_no_exist_impl'      'imageNameTarget'  'd' 'noexist'    'false' 'test_38_target' "
+      echo " 'audit_model_impl'                   'modelExpected'    'modelexpected_2' "
+      echo " 'audit_model_impl'                   'modelResult'      'modelresult_2' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'containerSource' )
+      testTargetArg_ref='imageNameTarget'
+    }
+    test_element_prequisite_test_Def(){
+      echo 'test_element_test_1_imp'
+      echo 'test_element_test_2_imp'
+    }
+  }
+  test_element_test_2_imp
+  dkrcp_test_Desc(){
+    echo "Create an image by copying the existing contents of a container's"  \
+         "directory into the image. The target directory does not exist"      \
+         " Outcome: image is created with contents of source directory"       \
+         "copied into the newly created target directory."
+  }
+}
+###############################################################################
+dkrcp_test_39(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_a'    'd' 'dir_a'     'file_content_dir_create'  "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_a'  'f' 'dir_a/a'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_b'  'f' 'dir_a/b'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_c'  'f' 'dir_a/c'   'file_content_reflect_name' "
+      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTarget'   'd' 'dir_a'  'false' 'test_39_source' "
+      echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=(  'hostFile_dir_a' )
+      testDependArgList=(  'hostFile_dir_a_a' )
+      testDependArgList+=( 'hostFile_dir_a_b' )
+      testDependArgList+=( 'hostFile_dir_a_c' )
+      testTargetArg_ref='imageNameTarget'
+    }
+  }
+  test_element_test_2_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_container_exist_impl'     'containerSource'  'f' '/dir_a/a'   'true'  'test_39_source' "
+      echo " 'dkrcp_arg_image_no_exist_impl'      'imageNameTarget'  'd' '/dev/pts'   'true'  'test_39_target' "
+      echo " 'audit_model_impl'                   'modelExpected'    'modelexpected_2' "
+      echo " 'audit_model_impl'                   'modelResult'      'modelresult_2' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'containerSource' )
+      testTargetArg_ref='imageNameTarget'
+    }
+    test_element_prequisite_test_Def(){
+      echo 'test_element_test_1_imp'
+      echo 'test_element_test_2_imp'
+    }
+  }
+  test_element_test_2_imp
+  dkrcp_test_Desc(){
+    echo "Create an image by copying an existing container file"  \
+         "into the image. The target directory exists.  Outcome:" \
+         "image is created with file created in the"              \
+         "target directory."
+  }
+}
+###############################################################################
+dkrcp_test_40(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_a'    'd' 'dir_a'     'file_content_dir_create'  "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_a'  'f' 'dir_a/a'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_b'  'f' 'dir_a/b'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_c'  'f' 'dir_a/c'   'file_content_reflect_name' "
+      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTarget'   'd' 'dir_a'  'false' 'test_40_source' "
+      echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=(  'hostFile_dir_a' )
+      testDependArgList=(  'hostFile_dir_a_a' )
+      testDependArgList+=( 'hostFile_dir_a_b' )
+      testDependArgList+=( 'hostFile_dir_a_c' )
+      testTargetArg_ref='imageNameTarget'
+    }
+  }
+  test_element_test_2_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_container_exist_impl'             'containerSource'  'f' '/dir_a/a'          'true'  'test_40_source' "
+      echo " 'dkrcp_arg_image_no_exist_target_bad_impl'   'imageNameTarget'  'd' '/noexist/noexist/' 'false' 'test_40_target' 'no.such.directory' "
+      echo " 'audit_model_impl'                           'modelExpected'    'modelexpected_2' "
+      echo " 'audit_model_impl'                           'modelResult'      'modelresult_2' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'containerSource' )
+      testTargetArg_ref='imageNameTarget'
+    }
+    test_element_prequisite_test_Def(){
+      echo 'test_element_test_1_imp'
+      echo 'test_element_test_2_imp'
+    }
+  }
+  test_element_test_2_imp
+  dkrcp_test_Desc(){
+    echo "Attempt to create an image by copying an existing container file"  \
+         "into the image. The target directory does not exist.  Outcome:"    \
+         "failure rollsback image creation."
+  }
+}
+###############################################################################
+dkrcp_test_41(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_image_remote'        'imageNameSource'   'f' 'dir_a'  'true'  'whisperingchaos/dkrcp_test_test_41_remote' "
+      echo " 'dkrcp_arg_image_no_exist_impl' 'imageNameTarget'   'd' 'dir_a'  'false' 'test_41_target' "
+      echo " 'audit_model_impl'              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testTargetArg_ref='imageNameSource'
+      testTargetArg_ref='imageNameTarget'
+    }
+  }
+  test_element_test_1_imp
+  dkrcp_test_Desc(){
+    echo "Attempt to create an image by copying an existing container file"  \
+         "into the image. The target directory does not exist.  Outcome:"    \
+         "failure rollsback image creation."
   }
 }
