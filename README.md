@@ -64,6 +64,8 @@ A double colon '```::```' delimiter classifies the file path as referring to an 
 
 When processing image arguments, ```dkrcp``` perfers binding to images known locally to Docker Engine that match the provided name and will ignore remote ones unless directed to search for them.  To include remote registries, specify the option: ```--ucpchk-reg=true```.  Enabling this feature will cause ```dkrcp``` to initiate ```docker pull``` iff the specified image name is not locally known.  Note, when enabled, ```ucpchk-reg``` applies to both SOURCE and TARGET image references. Therefore, in situations where the TARGET image name doesn't match a locally existing image but refers to an existing remote image, this remote image will be pulled and become the one referenced by TARGET.
 
+Since copying to an existing TARGET image first applies this operation to a derived container (an image replica), its effects are "reversible".  Failures involving existing images simply delete the derived container leaving the repository unchanged.  However, when adding a new image to the local repository, the repository's state is first updated to reflect a [```scratch```](https://docs.docker.com/engine/userguide/eng-image/baseimages/#creating-a-simple-base-image-using-scratch) version of the image.  This ```scratch``` image is then updated in the same way as any existing TARGET image but if a failure occurs during the copy process, both the container and ```scratch``` image are removed, reverting the local repository's state.
+
 ######Copy *from* an *existing image*:
   * Convert the referenced image to a container via [```docker create```](https://docs.docker.com/engine/reference/commandline/create).
   * Copy from this container using ```docker cp```.
