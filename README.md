@@ -57,15 +57,17 @@ However, the following tabular form offers an equivalent description of copy beh
 
 ######SOURCE Directory Content: An existing directory path appended with '/.'.
 
-The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it a file, directory, or stream is successfully copied, as long as the TARGET refers to a preexisting directory, otherwise, the operation fails.  
+The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it a file, directory, or stream is successfully copied, as long as the TARGET refers to a preexisting directory, otherwise, the operation fails.
 
 ##### Images as SOURCE/TARGET
 A double colon '```::```' delimiter classifies the file path as referring to an image, differenciating it from the single one denoting a container reference.  Therefore, an argument referencing an image involving a tag would appear similar to: '```repository_name:tag::etc/hostname```'.
 
+When processing image arguments, ```dkrcp``` always perfers binding to images known locally to Docker Engine that match the provided name and will ignore remote ones unless directed to search for them.  To include remote registries, specify the option: ```--ucpchk-reg=true```.  Enabling this feature will cause ```dkrcp``` to initiate a ```docker pull``` iff the specified image name is not locally known.  Note, when enabled, ```ucpchk-reg``` applies to both SOURCE and TARGET image references. Therefore, in situations where the TARGET image name doesn't refer to a locally existing image and happens to refer to an existing remote image, this remote image will be pulled and become the one referenced by TARGET.
+
 ######Copy *from* an *existing image*:
   * Convert the referenced image to a container via [```docker create```](https://docs.docker.com/engine/reference/commandline/create).
   * Copy from this container using ```docker cp```.
-  * ```dkrcp``` destroys this container using ```docker rm```.
+  * Destroy this container using ```docker rm```.
 
 ######Copy *to* an *existing image*:
   * Convert the referenced image to a container via ```docker create```.
@@ -74,7 +76,7 @@ A double colon '```::```' delimiter classifies the file path as referring to an 
     * Specifying an image name as a TARGET argument propagates this name to ```docker commit``` superseding the originally named image.
     * When processing multiple SOURCE arguments, ```dkrcp``` delays the commit until after iterating over all of them.
   * If copy fails, ```dkrcp``` bypasses the commit.
-  * ```dkrcp``` destroys this container using ```docker rm```.
+  * Destroy this container using ```docker rm```.
 
 ######Copy *to create* an *image*:
   * Execute a ```docker build``` using ```FROM scratch```
