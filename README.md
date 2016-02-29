@@ -72,14 +72,15 @@ When processing image arguments, ```dkrcp``` always perfers binding to images kn
 ######Copy *to* an *existing image*:
   * Convert the referenced image to a container via ```docker create```.
   * Copy to this container using ```docker cp```.
-  * If copy succeeds, ```dkrcp``` converts this container's state to an image using ```docker commit```.  
+    * When both the SOURCE and TARGET involve containers, the initial copy strategy streams ```docker cp``` output of the SOURCE container to a receiving ```docker cp``` that accepts this output as its input to the TARGETed container.  As long as the TARGET references an existing directory, the copy succeeds completing the operation.  However, if this copy strategy should fail, a second strategy executes a series of ```docker cp``` operations.  The first copy in this series, replicates the SOURCE artifacts to a temporary directory in the host environment executing ```dkrcp```.  A second ```docker cp``` then relays this SOURCE replica to the TARGET container.
+  * If copy succeeds, ```dkrcp``` converts this container's state to an image using [```docker commit```](https://docs.docker.com/engine/reference/commandline/commit/).  
     * Specifying an image name as a TARGET argument propagates this name to ```docker commit``` superseding the originally named image.
     * When processing multiple SOURCE arguments, ```dkrcp``` delays the commit until after iterating over all of them.
   * If copy fails, ```dkrcp``` bypasses the commit.
   * Destroy this container using ```docker rm```.
 
 ######Copy *to create* an *image*:
-  * Execute a ```docker build``` using ```FROM scratch```
+  * Execute a ```docker build``` using [```FROM scratch```](https://docs.docker.com/engine/userguide/eng-image/baseimages/#creating-a-simple-base-image-using-scratch).
   * Continue with [Copy *to* an *existing image*](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#copy-to-an-existing-image).
 
 #### Why?
