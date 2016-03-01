@@ -106,10 +106,15 @@ Since copying to an existing TARGET image first applies this operation to a deri
   * Select/create the desired directory to contain this project's git repository.
   * Use ```cd``` command to make this directory current.
   * Depending on what you wish to install execute:
-    * ```git clone``` to copy entire project contents including the git repository.  Current master which may include untested features.
+    * ```git clone``` to copy entire project contents including the git repository.  Obtains current master which may include untested features.
     * [```git archive```](https://www.kernel.org/pub/software/scm/git/docs/git-archive.html) to copy only the necessary project files without the git repository.  Archive can be selective by specifying tag or branch name.
-    *  wget https://github.com/whisperingchaos/dkrcp/zipball/master creates a zip that includes only the project files without the git repository.  Current master branch which may include untested features.
-  * Selectively add the 'dkrcp' alias by running the provided     
+    *  wget https://github.com/whisperingchaos/dkrcp/zipball/master creates a zip that includes only the project files without the git repository.  Obtains current master branch which may include untested features.
+  * Selectively add the 'dkrcp' alias by running [alias_Install.sh](https://github.com/WhisperingChaos/dkrcp/blob/master/alias_Install.sh).
+
+#####Testing ```dkrcp```
+Execution of ```dkrcp```'s test program: ```dkrcp_Test.sh```, ensures its proper operation within its installed host environment.  Since ```dkrcp_Test.sh``` must affect the local repository to verify ```dkrcp```'s operation, it first performs a scan of the local environment to determine if its produced artifacts overlap existing file system and Docker repository ones.  The scan operation will generate a report and terminate further testing upon detection of overlapping artifacts.  Please note that all testing artifact names begin with the ```dkrcp_test``` namespace, so it's unlikely image or file names in the host environment will collide with ones generated during testing.
+  * Execute ```dkrcp``` test program to ensure it's proper operation in its newly installed host environment.
+    * ./drkcp_Test.sh 
 
 
 #### Why?
