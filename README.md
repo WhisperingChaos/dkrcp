@@ -1,5 +1,9 @@
 # dkrcp
 Copy files between host's file system, containers, and images.
+#####ToC
+[Copy Semantics](#copy-semantics)  
+&nbsp;&nbsp;&nbsp;&nbsp;[Images as SOURCE/TARGET](images-as-source-target)
+
 ```
 Usage: ./dkrcp.sh [OPTIONS] SOURCE [SOURCE]... TARGET 
 
@@ -91,3 +95,15 @@ Since copying to an existing TARGET image first applies this operation to a deri
   * Facilitates manufacturing images by piplines that gradually evolve either toward or away from their reliance on Dockerfiles.
     *  To accelerate the adoption of Docker containers, strategies dkrcp can enable a strategy increace developers understanding of Docker through the measured adoption by  encapsulating build tool chains reqired by their application into Docker containers.  
   * Encapsulates the reliance on and encoding of several Docker CLI calls to implement the desired functionality insulating automation incorporating this utility from potentially future improved support by Docker community members through dkrcp's interface.
+
+###License
+
+The MIT License (MIT) Copyright (c) 2015-2016 Richard Moyse License@Moyse.US
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+###Legal Notice
+
+Docker and the Docker logo are trademarks or registered trademarks of Docker, Inc. in the United States and/or other countries. Docker, Inc. and other parties may also have trademark rights in other terms used herein.
