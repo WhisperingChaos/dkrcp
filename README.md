@@ -2,7 +2,8 @@
 Copy files between host's file system, containers, and images.
 #####ToC
 [Copy Semantics](#copy-semantics)  
-&nbsp;&nbsp;&nbsp;&nbsp;[Images as SOURCE/TARGET](images-as-source-target)
+&nbsp;&nbsp;&nbsp;&nbsp;[Images as SOURCE/TARGET](images-as-sourcetarget)  
+[Install](#install)
 
 ```
 Usage: ./dkrcp.sh [OPTIONS] SOURCE [SOURCE]... TARGET 
@@ -88,6 +89,28 @@ Since copying to an existing TARGET image first applies this operation to a deri
 ######Copy *to create* an *image*:
   * Execute a ```docker build``` using [```FROM scratch```](https://docs.docker.com/engine/userguide/eng-image/baseimages/#creating-a-simple-base-image-using-scratch).
   * Continue with [Copy *to* an *existing image*](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#copy-to-an-existing-image).
+
+####Install
+#####Dependencies
+  * GNU Bash 4.0+
+  * Docker Engine 1.8+
+
+#####Development Environment
+
+  * Ubuntu 12.04
+  * GNU Bash 4.2.25(1)-release
+  * Docker Engine 1.9.1
+
+#####Instructions
+
+  * Select/create the desired directory to contain this project's git repository.
+  * Use ```cd``` command to make this directory current.
+  * Depending on what you wish to install execute:
+    * ```git clone``` to copy entire project contents including the git repository.  Current master which may include untested features.
+    * [```git archive```](https://www.kernel.org/pub/software/scm/git/docs/git-archive.html) to copy only the necessary project files without the git repository.  Archive can be selective by specifying tag or branch name.
+    *  wget https://github.com/whisperingchaos/dkrcp/zipball/master creates a zip that includes only the project files without the git repository.  Current master branch which may include untested features.
+  * Selectively add the 'dkrcp' alias by running the provided     
+
 
 #### Why?
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
