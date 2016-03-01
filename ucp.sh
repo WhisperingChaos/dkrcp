@@ -2,14 +2,40 @@ source "MessageInclude.sh";
 source "ArgumentsGetInclude.sh";
 source "ArrayMapTestInclude.sh";
 source "VirtCmmdInterface.sh";
-#TODO: locate an include file providing frequently needed functions.
-ref_simple_value_Set(){
-  eval $1=\"\$2\"
-}
 #TODO: Add Digest support.
 #TODO: remove ScriptDebug messages.
 #TODO: support import as a mechanism to create images --upc-import
 #TODO: convert to more standard oo implementation
+###############################################################################
+#TODO:
+##
+##  Purpose:
+##    The variable argTargetObj exists globally to ensure it is in scope for 
+##    traps that execute a rollback should this script fail.  However, the
+##    trap commands should not be enabled until after this variable has been
+##    properly initiated.  The traps should also be disabled when execution
+##    successfully completes.
+##
+##    Sample scripts indicate that trap functions can access locally defined
+##    variables declared within the scope that contains the trap's definition.
+##    However, there's some behavior not completely understand, as visibility
+##    of scope doesn't "work" as anticipated in this script.
+##
+##    If popularity of script/better understanding of traps occurs then
+##    replace:
+##         target_obj_Create "$optArgMap_ref" "$argTarget" 'argTargetObj'
+##    with
+##         local -A argTargetObj
+##         target_obj_Create "$optArgMap_ref" "$argTarget" 'argTargetObj'
+##         local -r argTargetObj
+##
+###############################################################################
+declare -A argTargetObj=()
+
+#TODO: locate an include file providing frequently needed functions.
+ref_simple_value_Set(){
+  eval $1=\"\$2\"
+}
 ##############################################################################
 ##
 ##  Purpose:
@@ -174,22 +200,20 @@ VirtCmmdExecute(){
   # by the type of target object.
   target_type_${argTargetType}
   # verify compatibility between source & target types.
-  if ! arg_type_compatibility_Check 'argSourceList' 'argTargetType'; then return 1; fi
+  if ! arg_type_compatibility_Check 'argSourceList' "$argTargetType"; then return 1; fi
   # create target object
-  local -A argTargetObj
   target_obj_Create "$optArgMap_ref" "$argTarget" 'argTargetObj'
-  local -r argTargetObj
+  # set trap to release target object resources when copy error or something unexpected happens.
+  trap 'target_obj_Rollback argTargetObj' EXIT
   # ensure specified options are valid for target object
   local errorMessage
   if ! target_obj_arg_options_Check 'argTargetObj' "$optArgLst_ref" "$optArgMap_ref" 'errorMessage'; then
-      target_obj_Rollback 'argTargetObj'
       ScriptError "$errorMessage"
       return
   fi
   if (( ${#argSourceList[@]} > 1 )); then
     # linux cp -a requires the target refer to a directory when copying from multiple sources.
     if ! target_obj_arg_PermitsMultiSource 'argTargetObj' 'errorMessage'; then
-      target_obj_Rollback 'argTargetObj'
       ScriptError "$errorMessage"
       return
     fi
@@ -213,13 +237,11 @@ VirtCmmdExecute(){
     source_obj_Create "$optArgMap_ref" "${argSourceList[$ix_src]}" 'argSourceObj'
     local sourceReference
     source_obj_docker_arg_Get 'argSourceObj' 'sourceReference'
-    local -r sourceReference
-    # execute in a sub-shell in order to cleanup from copy exceptions  
+    # execute in a sub-shell acts as a try/catch block
     if ! ( cp_strategy_Exec "$dockerCpOpts" "$argSourceType" "$sourceReference" "$argTargetType" "$targetReference"; ); then
       #TODO: remove
       #cp_strategy_failure_Mess 'argSourceObj' 'argTargetObj'
       source_obj_Release 'argSourceObj'
-      target_obj_Rollback 'argTargetObj'
       false
       return
     fi
@@ -228,6 +250,8 @@ VirtCmmdExecute(){
   # successfully completed copy operation commit changes to target.
   target_obj_Commit  'argTargetObj' "$optArgLst_ref" "$optArgMap_ref"
   target_obj_Release 'argTargetObj'
+  # remove trap to rollback target argument object
+  trap -  EXIT
 }
 ##############################################################################
 ##
@@ -348,8 +372,8 @@ arg_source_target(){
 ##
 ###############################################################################
 arg_type_compatibility_Check(){
-  local argSourceList_ref="$1"
-  local argTargetType="$2"
+  local -r argSourceList_ref="$1"
+  local -r argTargetType="$2"
   local typeCompatSuccess='true'
   local ix_src
   for (( ix_src=0; ix_src < ${#argSourceList[@]}; ix_src++ ))
@@ -806,7 +830,7 @@ source_type_imagefilepath(){
   source_obj_Release(){
     local -r sourceObj_ref="$1"
     eval local \-r sourceContainer\=\"\$\{$sourceObj_ref\[sourceContainer\]\}\"
-    docker rm $sourceContainer>/dev/null
+    docker rm $sourceContainer >/dev/null
   }
 }
 ###############################################################################
@@ -892,7 +916,7 @@ target_type_imagefilepath(){
     local -r targetObj_ref="$1"
     eval local \-r targetContainer\=\"\$\{$targetObj_ref\[targetContainer\]\}\"
     # remove the container from which the image was committed.
-    docker rm $targetContainer>/dev/null
+    docker rm $targetContainer >/dev/null
   }
   target_obj_Rollback(){
     local -r targetObj_ref="$1"
@@ -1126,8 +1150,8 @@ cp_complex(){
     tmpHostRefTarget="${tmpHostRefTarget:0:-2}"
   fi
   local -r tmpHostRefTarget
-  rm -rf "$tmpHostRefTarget">/dev/null 2>/dev/null || true
-  if ! mkdir -p "$( dirname "$tmpHostRefTarget" )">/dev/null; then
+  rm -rf "$tmpHostRefTarget" >/dev/null 2>/dev/null || true
+  if ! mkdir -p "$( dirname "$tmpHostRefTarget" )" >/dev/null; then
     ScriptUnwind "$LINENO" "rm failed for: '$tmpHostRefTarget'."
   fi
   local successCopy='false'
@@ -1141,7 +1165,7 @@ cp_complex(){
     successCopy='true'
     break
   done
-  if ! rm -rf "$tmpHostRefRoot">/dev/null; then
+  if ! rm -rf "$tmpHostRefRoot" >/dev/null; then
     ScriptUnwind "$LINENO" "rm failed for: '$tmpHostRefRoot'."
   fi
   $successCopy;
@@ -1381,9 +1405,9 @@ image_Search(){
     if ! [[ $msgOut =~ ^Error:.No.such.image ]]; then
       ScriptUnwind "$LINENO" "Unexpected failure: '$msgOut' from 'docker inspect' when testing for image with name/UUID: '$imageNameUUID'."
     fi
-    # hopefully, calling agent knows that the provide refernece is a valid repository name,
-    # however, if UUID was specified it will most likely not be be found when pulling from hub.  
-    if $nameResolveReg && docker pull $imageNameUUID 2>&1 >/dev/null; then
+    # hopefully, calling agent knows that the provide reference is a valid repository name,
+    # however, if UUID was specified it will most likely not be be found when pulling from hub.
+    if $nameResolveReg && docker pull $imageNameUUID >/dev/null 2>/dev/null; then
       # prevent infinite loop when things go wrong
       local -r nameResolveReg='false'
       continue
