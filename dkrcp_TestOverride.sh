@@ -1,3 +1,14 @@
+#TODO:
+#   Encode additional tests:
+#     1.  Copy to image where source is image ID
+#     2.  Copy to an  image where target is an existing imageID
+#     3.  Copy to a container
+#     4.  Copy from a container
+#     5.  Copy using a container's name
+#     6.  Copy to an image from each one of the source types.
+#     7.  Copy to a stream from a source image
+#     8.  Copy from multiple sources to a stream
+#     9.  Copy with -L argument supported by 1.10.
 ref_simple_value_Set(){
   eval $1=\"\$2\"
 }
@@ -884,6 +895,7 @@ dkrcp_arg_image_no_exist_impl(){
     local imageName
     _reflect_field_Get "$this_ref" 'ImageName' 'imageName'
     local -r imageName
+    #ScriptDebug "$LINENO" "STD out: '$dkrcpSTDOUT'"
     PipeFailCheck 'docker inspect --type=image --format='"'{{ .Id }}'"' -- '"$imageName"' | grep '"$dkrcpSTDOUT"' >/dev/null' "$LINENO" "Expected imageUUID: '$dkrcpSTDOUT' to correspond to image name: '$imageName'."
   }
   dkrcp_arg_environ_Inspect(){
@@ -1075,8 +1087,11 @@ dkrcp_arg_image_remote(){
     # image name.
     local -r TEST_NAME_SPACE=''
     dkrcp_arg_image_or_container_Create 'dkrcp_arg_image_remote' "${@}"
+    local imageName
+    _reflect_field_Get "$1"         \
+    'ImageName'        'imageName'
   }
-}  
+}
 dkrcp_arg_container_exist_impl(){
   dkrcp_arg_interface
   ###########################################################################
@@ -1545,7 +1560,8 @@ test_element_impl(){
       local dkrcpTargetArg
       dkrcp_arg_Get "$testTargetArg_ref" 'dkrcpTargetArg' 
       local -r dkrcpTargetArg
-      eval "$dkrcpPrequelCmdStream" | eval dkrcp.sh $dkrcpCmdOptions "$dkrcpSourcArgs" "$dkrcpTargetArg" \2\>\&1 | dkrcp_arg_output_Inspect "$testTargetArg_ref"
+      # ScriptDebug "$LINENO" "options: $dkrcpCmdOptions \-\- $dkrcpSourcArgs   $dkrcpTargetArg"
+      eval "$dkrcpPrequelCmdStream" | eval dkrcp.sh $dkrcpCmdOptions \-\- "$dkrcpSourcArgs" "$dkrcpTargetArg" \2\>\&1 | dkrcp_arg_output_Inspect "$testTargetArg_ref"
       local -r dkrcpRunStatus="${PIPESTATUS[@]}"
       if ! [[ $dkrcpRunStatus =~ ^0.[0-9]+.0 ]]; then
         # output inspection detected an unexpected problem terminate testing
@@ -1640,7 +1656,7 @@ test_element_impl(){
       _test_element_model_expected_Create
       _test_element_model_result_Create
       _test_element_models_Compare
-      sleep 30
+      #sleep 30
     fi
   }
 }
@@ -3168,20 +3184,81 @@ dkrcp_test_41(){
   test_element_test_1_imp(){
     test_element_interface
     test_element_member_Def(){
-      echo " 'dkrcp_arg_image_remote'        'imageNameSource'   'f' 'dir_a'  'true'  'whisperingchaos/dkrcp_test_test_41_remote' "
+      echo " 'dkrcp_arg_image_remote'        'imageNameSource'   'd' 'dir_a'  'true'  'whisperingchaos/dkrcp_test_test_41_remote' "
       echo " 'dkrcp_arg_image_no_exist_impl' 'imageNameTarget'   'd' 'dir_a'  'false' 'test_41_target' "
       echo " 'audit_model_impl'              'modelExpected'     'modelexpected' "
       echo " 'audit_model_impl'              'modelResult'       'modelresult' "
     }
     test_element_args_Catgry(){
-      testTargetArg_ref='imageNameSource'
+      testSourceArgList=( 'imageNameSource' )
+      testTargetArg_ref='imageNameTarget'
+    }
+    test_element_cmd_options_Get(){
+      ref_simple_value_Set "$1" '--ucpchk-reg'
+    }
+  }
+  test_element_test_1_imp
+  dkrcp_test_Desc(){
+    echo "Create an image by copying a directory from a remote source image."   \
+         "The target directory does not exist.  Outcome: new image constructed" \
+         "with the contents of the remote image's directory copied to"          \
+         "the target directory."
+  }
+}
+###############################################################################
+dkrcp_test_42(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_b'    'd' 'dir_b'     'file_content_dir_create'  "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_b_d'  'f' 'dir_b/d'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_b_e'  'f' 'dir_b/e'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_b_f'  'f' 'dir_b/f'   'file_content_reflect_name' "
+      echo " 'dkrcp_arg_image_remote'        'imageNameTarget'   'd' 'dir_b'  'false'  'whisperingchaos/dkrcp_test_test_41_remote' "
+      echo " 'audit_model_impl'              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'hostFile_dir_b' )
+      testDependArgList=(  'hostFile_dir_b_d' )
+      testDependArgList+=( 'hostFile_dir_b_e' )
+      testDependArgList+=( 'hostFile_dir_b_f' )
+      testTargetArg_ref='imageNameTarget'
+    }
+    test_element_cmd_options_Get(){
+      ref_simple_value_Set "$1" '--ucpchk-reg'
+    }
+  }
+  test_element_test_1_imp
+  dkrcp_test_Desc(){
+    echo "Create a new local image by first pulling an existing remote image"  \
+         "and then copying a host directory into it."                          \
+         "The target directory does not exist.  Outcome: A new local image"    \
+         "that shares the same name as the remote one but has an additional"   \
+         "layer containing the contents of host file directory copied"         \
+         "into the target directory."
+  }
+}
+###############################################################################
+dkrcp_test_43(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_image_remote'                         'imageNameSource'   'd' 'dir_a'  'true'  'whisperingchaos/dkrcp_test_test_41_remote' "
+      echo " 'dkrcp_arg_image_no_exist_target_bad_impl'       'imageNameTarget'   'd' 'dir_a'  'false' 'test_43_target' '^Abort.+SOURCE.image.must.exist' "
+      echo " 'audit_model_impl'              'modelExpected'  'modelexpected' "
+      echo " 'audit_model_impl'              'modelResult'    'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=( 'imageNameSource' )
       testTargetArg_ref='imageNameTarget'
     }
   }
   test_element_test_1_imp
   dkrcp_test_Desc(){
-    echo "Attempt to create an image by copying an existing container file"  \
-         "into the image. The target directory does not exist.  Outcome:"    \
-         "failure rollsback image creation."
+    echo "Create an image by copying a directory from a remote source image."   \
+         "The target directory does not exist.  Outcome: new image constructed" \
+         "with the contents of the remote image's directory copied to"          \
+         "the target directory."
   }
 }
