@@ -3,8 +3,9 @@ Copy files between host's file system, containers, and images.
 #####ToC
 [Copy Semantics](#copy-semantics)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Images as SOURCE/TARGET](images-as-sourcetarget)  
-[Install](#install)  
-[Why ```dkrcp```?](#why-dkrcp)
+[Installing](#install)  
+[Testing](#testing)  
+[Motivation](#motivation)
 
 ```
 Usage: ./dkrcp.sh [OPTIONS] SOURCE [SOURCE]... TARGET 
@@ -112,13 +113,22 @@ Since copying to an existing TARGET image first applies this operation to a deri
     *  wget https://github.com/whisperingchaos/dkrcp/zipball/master creates a zip that includes only the project files without the git repository.  Obtains current master branch which may include untested features.
   * Selectively add the 'dkrcp' alias by running [alias_Install.sh](https://github.com/WhisperingChaos/dkrcp/blob/master/alias_Install.sh).
 
-#####Testing ```dkrcp```
-Execution of ```dkrcp```'s test program: ```dkrcp_Test.sh```, ensures its proper operation within its installed host environment.  Since ```dkrcp_Test.sh``` must affect the local repository to verify ```dkrcp```'s operation, it first performs a scan of the local environment to determine if its produced artifacts overlap existing file system and Docker repository ones.  The scan operation will generate a report and terminate further testing upon detection of overlapping artifacts.  Please note that all testing artifact names begin with the ```dkrcp_test``` namespace, so it's unlikely image or file names in the host environment will collide with ones generated during testing.
+#####Testing
+Execution of ```dkrcp```'s test program: ```dkrcp_Test.sh```, ensures its proper operation within its installed host environment.  Since ```dkrcp_Test.sh``` must affect the local repository to verify ```dkrcp```'s operation, it first performs a scan of the local environment to determine if its produced artifacts overlap existing file system and Docker repository ones.  The scan operation will generate a report and terminate testing upon detection of overlapping artifacts.  Please note that all testing artifact names begin with the ```dkrcp_test``` namespace, so it's unlikely image or file names in the host environment will collide with ones generated during testing.
   * Execute ```dkrcp``` test program to ensure it's proper operation in its newly installed host environment.
-    * ./drkcp_Test.sh 
+```
+   # without any parameters checks dependencies, scans for remnants, 
+   # cleans the environment before starting, and executes every test.
+   > ./drkcp_Test.sh 
+   # dependency checking examines the local repository for existing
+   # images and containers.  if the repository isn't empty, the
+   # script terminates before running any test.  if this occurs,
+   # run the following:
+   > ./dkrcp_Test.sh --no-depend
 
+```
 
-#### Why ```dkrcp```?
+####Motivation
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application when creating the runtime image.
     * Use one or more Dockerfiles to generate the artifacts needed by the application.
     * Use ```dkrcp``` to copy the desired runtime artifacts from these containers/images and create the essential runtime image.
