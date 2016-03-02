@@ -124,7 +124,7 @@ VirtCmmdVersionDisplay () {
 cat <<VERSION_DOC
 
 Version : 0.5
-Requires: bash 4.2+, Docker Client 1.8+
+Requires: bash 4.0+, Docker Client 1.8+
 Issues  : https://github.com/WhisperingChaos/dkrcp/issues
 License : The MIT License (MIT) Copyright (c) 2014-2016 Richard Moyse License@Moyse.US
 
@@ -907,7 +907,7 @@ target_type_imagefilepath(){
     local containerFilePath
     target_obj_docker_arg_Get "$this_ref" 'containerFilePath'
     local -r containerFilePath
-    if container_filepath_IsDir "$containerFilePath"; then
+    if ! container_filepath_IsDir "$containerFilePath"; then
       ref_simple_value_Set "$errorMess_ref" "Multiple sources require target to be an existing directory."
       false
     fi
