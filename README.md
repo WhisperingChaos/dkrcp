@@ -117,10 +117,10 @@ Execution of ```dkrcp```'s test program: ```dkrcp_Test.sh```, ensures its proper
     * ./drkcp_Test.sh 
 
 
-#### Why?
-  * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
-    * Use one or more Dockerfiles to generate 
-    * Use ```dkrcp``` to copy the desired runtime artifacts from these images and create the essential runtime image.
+#### Why ```dkrcp```?
+  * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application when creating the runtime image.
+    * Use one or more Dockerfiles to generate the artifacts needed by the application.
+    * Use ```dkrcp``` to copy the desired runtime artifacts from these containers/images and create the essential runtime image.
   * Facilitates manufacturing applications by piplines that gradually incorporate Docker containers.
     *  Existing build pipelines can replace locally installed build tool chains with Docker Hub provided build tool chain images, such as [golang](https://hub.docker.com/_/golang/).  The Docker Hub containerized versions potentially elimiate the need to physically install/configure a locally hosted tool chain and fully isolate build processes to ensure their repeatability.  Once a containerized build process completes, its desired artifacts can then be transferred from the resultant container/image to a host file result directory using ```dkrcp```.
   * Encapsulates the reliance on and encoding of several Docker CLI calls to implement the desired functionality insulating automation incorporating this utility from potentially future improved support by Docker community members through dkrcp's interface.
