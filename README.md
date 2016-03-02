@@ -3,7 +3,9 @@ Copy files between host's file system, containers, and images.
 #####ToC
 [Copy Semantics](#copy-semantics)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Images as SOURCE/TARGET](images-as-sourcetarget)  
-[Install](#install)
+[Installing](#install)  
+[Testing](#testing)  
+[Motivation](#motivation)
 
 ```
 Usage: ./dkrcp.sh [OPTIONS] SOURCE [SOURCE]... TARGET 
@@ -69,7 +71,7 @@ A double colon '```::```' delimiter classifies the file path as referring to an 
 
 When processing image arguments, ```dkrcp``` perfers binding to images known locally to Docker Engine that match the provided name and will ignore remote ones unless directed to search for them.  To include remote registries, specify the option: ```--ucpchk-reg=true```.  Enabling this feature will cause ```dkrcp``` to initiate ```docker pull``` iff the specified image name is not locally known.  Note, when enabled, ```ucpchk-reg``` applies to both SOURCE and TARGET image references. Therefore, in situations where the TARGET image name doesn't match a locally existing image but refers to an existing remote image, this remote image will be pulled and become the one referenced by TARGET.
 
-Since copying to an existing TARGET image first applies this operation to a derived container (an image replica), its effects are "reversible".  Failures involving existing images simply delete the derived container leaving the repository unchanged.  However, when adding a new image to the local repository, the repository's state is first updated to reflect a [```scratch```](https://docs.docker.com/engine/userguide/eng-image/baseimages/#creating-a-simple-base-image-using-scratch) version of the image.  This ```scratch``` image is then updated in the same way as any existing TARGET image but if a failure occurs during the copy process, both the container and ```scratch``` image are removed, reverting the local repository's state.
+Since copying to an existing TARGET image first applies this operation to a derived container (an image replica), its effects are "reversible".  Failures involving existing images simply delete the derived container leaving the repository unchanged.  However, when adding a new image to the local repository, the repository's state is first updated to reflect a [```scratch```](https://docs.docker.com/engine/userguide/eng-image/baseimages/#creating-a-simple-base-image-using-scratch) version of the image.  This ```scratch``` image is then updated in the same way as any existing TARGET image.  In this situation, a failure removes both the container and ```scratch``` image reverting the local repository's state.
 
 ######Copy *from* an *existing image*:
   * Convert the referenced image to a container via [```docker create```](https://docs.docker.com/engine/reference/commandline/create).
@@ -111,17 +113,27 @@ Since copying to an existing TARGET image first applies this operation to a deri
     *  wget https://github.com/whisperingchaos/dkrcp/zipball/master creates a zip that includes only the project files without the git repository.  Obtains current master branch which may include untested features.
   * Selectively add the 'dkrcp' alias by running [alias_Install.sh](https://github.com/WhisperingChaos/dkrcp/blob/master/alias_Install.sh).
 
-#####Testing ```dkrcp```
-Execution of ```dkrcp```'s test program: ```dkrcp_Test.sh```, ensures its proper operation within its installed host environment.  Since ```dkrcp_Test.sh``` must affect the local repository to verify ```dkrcp```'s operation, it first performs a scan of the local environment to determine if its produced artifacts overlap existing file system and Docker repository ones.  The scan operation will generate a report and terminate further testing upon detection of overlapping artifacts.  Please note that all testing artifact names begin with the ```dkrcp_test``` namespace, so it's unlikely image or file names in the host environment will collide with ones generated during testing.
+#####Testing
+Execution of ```dkrcp```'s test program: ```dkrcp_Test.sh```, ensures its proper operation within its installed host environment.  Since ```dkrcp_Test.sh``` must affect the local repository to verify ```dkrcp```'s operation, it first performs a scan of the local environment to determine if its produced artifacts overlap existing file system and Docker repository ones.  The scan operation will generate a report and terminate testing upon detection of overlapping artifacts.  Please note that all testing artifact names begin with the ```dkrcp_test``` namespace, so it's unlikely image or file names in the host environment will collide with ones generated during testing.
   * Execute ```dkrcp``` test program to ensure it's proper operation in its newly installed host environment.
-    * ./drkcp_Test.sh 
+```
+   # without any parameters checks dependencies, scans for remnants, 
+   # cleans the environment before starting, and executes every test.
+   > ./drkcp_Test.sh 
+   # dependency checking examines the local repository for existing
+   # images and containers.  if the repository isn't empty, the
+   # script terminates before running any test.  if this occurs,
+   # run the following:
+   > ./dkrcp_Test.sh --no-depend
 
+```
 
-#### Why?
-  * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application.
-    * Although special effort has been applied to minimize the size of Official Docker Hub images, the inability of Docker's [builder](https://github.com/docker/docker/tree/master/builder) component to separate build time produced artifacts and their required dependencies continues to pollute the runtime image with unnecessary artifacts increasing the runtime container's attack surface.  For example, images requiring build tool chains, like golang and C++, incorporate compilers, linkers, dependent libraries, ... into their files systems.  At best these tool chain resources can be 'logically' removed from the file system through their deletion.  These and other file system artifacts employed by the build, like C++ object files, will remain accessible in the runtime file system if not properly removed by the build process.  
-  * Facilitates manufacturing images by piplines that gradually evolve either toward or away from their reliance on Dockerfiles.
-    *  To accelerate the adoption of Docker containers, strategies dkrcp can enable a strategy increace developers understanding of Docker through the measured adoption by  encapsulating build tool chains reqired by their application into Docker containers.  
+####Motivation
+  * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application when creating the runtime image.
+    * Use one or more Dockerfiles to generate the artifacts needed by the application.
+    * Use ```dkrcp``` to copy the desired runtime artifacts from these containers/images and create the essential runtime image.
+  * Facilitates manufacturing applications by piplines that gradually incorporate Docker containers.
+    *  Existing build pipelines can replace locally installed build tool chains with Docker Hub provided build tool chain images, such as [golang](https://hub.docker.com/_/golang/).  The Docker Hub containerized versions potentially elimiate the need to physically install/configure a locally hosted tool chain and fully isolate build processes to ensure their repeatability.  Once a containerized build process completes, its desired artifacts can then be transferred from the resultant container/image to a host file result directory using ```dkrcp```.
   * Encapsulates the reliance on and encoding of several Docker CLI calls to implement the desired functionality insulating automation incorporating this utility from potentially future improved support by Docker community members through dkrcp's interface.
 
 ###License
