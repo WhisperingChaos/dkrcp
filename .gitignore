@@ -1,0 +1,5 @@
+*~
+.project
+.buildpath
+lib/
+dindServer.sh
