@@ -67,7 +67,7 @@ TEST_NUM:  {'${TEST_SELECT}'| REGEX_SPEC [REGEX_SPEC...]}
                 set. Must select at least one test to be considered valid. 
                 Selected set executed in numerical order.
 OPTIONS:
-    --no-depnd=false     Execute dependency testing to ensure that dependent components
+    --no-depend=false    Execute dependency testing to ensure that dependent components
                            exist and are in correct state. 
     --no-scan=false      Execute tests without initially scanning the environment for 
                            every artifact created, used, and destroyed by every test.
@@ -93,9 +93,9 @@ VirtCmmdOptionsArgsDef(){
 cat <<OPTIONARGS
 Arg1 single '[0-9]*' "TestSelectSpecificationVerify \\<Arg1\\>" required ""
 ArgN single ''       "TestSelectSpecificationVerify \\<ArgN\\>" optional ""
---no-depnd single false=EXIST=true "OptionsArgsBooleanVerify \\<--no-depnd\\>" required ""
---no-scan  single false=EXIST=true "OptionsArgsBooleanVerify \\<--no-scan\\>"  required ""
---no-clean single false=EXIST=true "OptionsArgsBooleanVerify \\<--no-clean\\>" required ""
+--no-depend single false=EXIST=true "OptionsArgsBooleanVerify \\<--no-depend\\>" required ""
+--no-scan   single false=EXIST=true "OptionsArgsBooleanVerify \\<--no-scan\\>"  required ""
+--no-clean  single false=EXIST=true "OptionsArgsBooleanVerify \\<--no-clean\\>" required ""
 OPTIONARGS
 }
 ###############################################################################
@@ -224,7 +224,7 @@ VirtCmmdExecute(){
   local argOptList_ref="$1"
   local argOptMap_ref="$2"
   # assert testing dependencies are sufficient to support testing environment
-  local -r ignoreDepend="`AssociativeMapAssignIndirect "$argOptMap_ref" '--no-depnd'`"
+  local -r ignoreDepend="`AssociativeMapAssignIndirect "$argOptMap_ref" '--no-depend'`"
   if ! $ignoreDepend; then
     TestEnvironentDependenciesAssert
   fi
