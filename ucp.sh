@@ -13,13 +13,13 @@ source "VirtCmmdInterface.sh";
 ##    The variable argTargetObj exists globally to ensure it is in scope for 
 ##    traps that execute a rollback should this script fail.  However, the
 ##    trap commands should not be enabled until after this variable has been
-##    properly initiated.  The traps should also be disabled when execution
+##    properly constructed.  The traps should also be disabled when execution
 ##    successfully completes.
 ##
 ##    Sample scripts indicate that trap functions can access locally defined
 ##    variables declared within the scope that contains the trap's definition.
-##    However, there's some behavior not completely understand, as visibility
-##    of scope doesn't "work" as anticipated in this script.
+##    However, there's some behavior not completely understood, as this
+##    scope mechanism "work" as anticipated in this script.
 ##
 ##    If popularity of script/better understanding of traps occurs then
 ##    replace:
@@ -239,8 +239,6 @@ VirtCmmdExecute(){
     source_obj_docker_arg_Get 'argSourceObj' 'sourceReference'
     # execute in a sub-shell acts as a try/catch block
     if ! ( cp_strategy_Exec "$dockerCpOpts" "$argSourceType" "$sourceReference" "$argTargetType" "$targetReference"; ); then
-      #TODO: remove
-      #cp_strategy_failure_Mess 'argSourceObj' 'argTargetObj'
       source_obj_Release 'argSourceObj'
       false
       return
@@ -682,6 +680,7 @@ target_type_simple(){
     target_arg_only_options_Exclude "$2" "$3" "$targetTypeName" '' "$4"
   }
   target_obj_arg_PermitsMultiSource(){
+    local errorMess_ref="$2"
     ref_simple_value_Set "$errorMess_ref" "Target does not support more than one source."
     false
   }
@@ -810,10 +809,10 @@ source_type_imagefilepath(){
     local -r imageNameUUID
     # create a container from the source image.
     local sourceContainer
-    local entryptNullify
-    image_container_Create "$imageNameUUID" 'sourceContainer' 'entryptNullify'
+    local entryPtNullify
+    image_container_Create "$imageNameUUID" 'sourceContainer' 'entryPtNullify'
     local -r sourceContainer
-    local -r entryptNullify
+    local -r entryPtNullify
     local -r sourceRef="${sourceContainer}:${imageFilePath}"
     # update source object standard properties.
     eval $sourceObj_ref\[objRef\]\=\"\$\sourceRef\"
@@ -858,16 +857,15 @@ target_type_imagefilepath(){
     fi
     # convert image into container.
     local targetContainer
-    local entryPtCurrent
-    image_container_Create "$imageNameUUID" 'targetContainer' 'entryPtCurrent'
+    local entryPtNullify
+    image_container_Create "$imageNameUUID" 'targetContainer' 'entryPtNullify'
     local -r targetContainer
-    local -r entryptNullify
     # update target object standard properties.
     eval $targetObj_ref\[objRef\]\=\"\$\{targetContainer\}\:\$\{imageFilePath\}\"
     eval $targetObj_ref\[objType\]\=\'imagefilepath\'
     # update target object derived properties.
     eval $targetObj_ref\[targetContainer\]\=\"\$targetContainer\"
-    eval $targetObj_ref\[entryPtCurrent\]\=\"\$entryPtCurrent\"
+    eval $targetObj_ref\[entryPtNullify\]\=\"\$entryPtNullify\"
     if $imageNmRepoIs; then
       eval $targetObj_ref\[imageName\]\=\"\$imageNameUUID\"
     fi
@@ -892,9 +890,9 @@ target_type_imagefilepath(){
     fi
     local -r dockerCommitOpt
     eval local \-r targetContainer\=\"\$\{$targetObj_ref\[targetContainer\]\}\"
-    eval local \-r entryPtCurrent\=\"\$\{$targetObj_ref\[entryPtCurrent\]\}\"
+    eval local \-r entryPtNullify\=\"\$\{$targetObj_ref\[entryPtNullify\]\}\"
     eval local \-r imageName\=\"\$\{$targetObj_ref\[imageName\]\}\"
-    eval docker commit $entryptNullify $dockerCommitOpt \$targetContainer \$imageName
+    eval docker commit $entryPtNullify $dockerCommitOpt \$targetContainer \$imageName
   }
   target_obj_arg_options_Check(){
     local imageFilePathType
@@ -1170,19 +1168,6 @@ cp_complex(){
   fi
   $successCopy;
 }
-#TODO: if not necessary, remove
-#cp_strategy_failure_Mess(){
-  #  local -r argSourceObj_ref="$1"
-  #  local -r argTargetObj_ref="$2"
-  #  local argSourceType
-  #  source_obj_type_Get 'argSourceType'
-  #local argPathSource
-  #source_obj_docker_arg_Get "$argSourceObj_ref" 'argPathSource'
-  #local argPathTarget
-  #target_obj_docker_arg_Get "$argTargetObj_ref" 'argPathTarget'
-  #ScriptError "Copy failure source type: '$argSourceType', source: '$argPathSource', target type: '$argTargetType', target: '$argPathTarget'."
-#}
-
 ##############################################################################
 ##
 ##  Purpose:
@@ -1419,6 +1404,7 @@ image_Search(){
   eval $UUIDout_ref\=\"\$UUIDout_lcl\"
 }
 ##############################################################################
+#TODO: Place in common docker include source
 ##
 ##  Purpose:
 ##    Convert an image to a container.  As a container, the image can be
@@ -1428,8 +1414,8 @@ image_Search(){
 ##    $1 - Existing image name or image UUID.
 ##    $2 - A variable to contain the resulting container UUID created from
 ##         the given image.
-##    $3 - A variable to contain ENTRYPOINT nullify directive.  If the image
-##         lacks an ENTRYPOINT or CMD, a pseudo one is created to permit the
+##    $3 - (optional) A variable to contain ENTRYPOINT nullify directive.  If the image
+##         lacks an ENTRYPOINT or CMD, a pseudo one is manufactured to permit the
 ##         docker create to successfully complete.  However, to consistently
 ##         maintain this property value in the newly derived image,
 ##         the ENTRYPOINT must be nullified.  This variable records, if 
@@ -1437,15 +1423,15 @@ image_Search(){
 ##
 ##  Output:
 ##    $2 - Variable updated to reflect newly created container UUID.
-##    $3 - Variable updated to ENTRYPOINT directive.
+##    $3 - (optional) Variable updated to ENTRYPOINT directive.
 ##
 ###############################################################################
 image_container_Create(){
   local imageNameUUID="$1"
   local targetContainer_ref="$2"
-  local entryptNullify_ref="$3"
+  local entryPtNullify_ref="$3"
 
-  local entryptNullify_lcl=''
+  local entryPtNullify_lcl=''
   local targetContainer_lcl=''
   while true; do
     if targetContainer_lcl="$( docker create $imageNameUUID 2>&1 )"; then
@@ -1456,14 +1442,16 @@ image_container_Create(){
        && targetContainer_lcl="$( docker create --entrypoint=['','']  $imageNameUUID 2>&1 )"; then
       # create was successful after generating pseudo ENTRYPOINT. Encode directive
       # to nullify ENTRYPOINT in resulting image.
-      entryptNullify_lcl='-c="'"ENTRYPOINT null"'"'
+      entryPtNullify_lcl="-c='ENTRYPOINT []'"
       break
     fi
     # some unexpected error
     echo "$targetContainer_lcl" >&2
     ScriptUnwind "$LINENO" "Failed while creating container from image: '$imageNameUUID'."
   done
-  eval $entryptNullify_ref\=\"\$entryptNullify_lcl\"
+  if [ -n "$entryPtNullify_ref" ]; then
+    eval $entryPtNullify_ref\=\"\$entryPtNullify_lcl\"
+  fi
   eval $targetContainer_ref\=\"\$targetContainer_lcl\"
 }
 ##############################################################################
@@ -1480,7 +1468,7 @@ image_container_Create(){
 ##    STDOUT - suppressed.
 ##
 ###############################################################################
-image_Create() {
+image_Create(){
   local -r imageNameUUID="$1"
 
   dockerfile_stream(){
