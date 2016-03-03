@@ -69,7 +69,7 @@ TestEnvironentDependenciesAssert(){
   ! TestDependenciesScanSuccess 'Testdependency_define_Bash'            '4.'   && depndSuccess='false'
   ! TestDependenciesScanSuccess 'dkrcp_dependency_dkrcp'                '0.5'   && depndSuccess='false'
   ! TestLocalRepositoryIsEmpty && depndSuccess='false'
-  ! $depndSuccess && ScriptUnwind "$LINENO" "Detected problematic dependencies.  Repair or try '--no-depnd'."
+  ! $depndSuccess && ScriptUnwind "$LINENO" "Detected problematic dependencies.  Repair or try '--no-depend'."
   true
 }
 ###############################################################################
