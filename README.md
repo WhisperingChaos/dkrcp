@@ -97,12 +97,6 @@ Since copying to an existing TARGET image first applies this operation to a deri
   * GNU Bash 4.0+
   * Docker Engine 1.8+
 
-#####Development Environment
-
-  * Ubuntu 12.04
-  * GNU Bash 4.2.25(1)-release
-  * Docker Engine 1.9.1
-
 #####Instructions
 
   * Select/create the desired directory to contain this project's git repository.
@@ -112,6 +106,11 @@ Since copying to an existing TARGET image first applies this operation to a deri
     * [```git archive```](https://www.kernel.org/pub/software/scm/git/docs/git-archive.html) to copy only the necessary project files without the git repository.  Archive can be selective by specifying tag or branch name.
     *  wget https://github.com/whisperingchaos/dkrcp/zipball/master creates a zip that includes only the project files without the git repository.  Obtains current master branch which may include untested features.
   * Selectively add the 'dkrcp' alias by running [alias_Install.sh](https://github.com/WhisperingChaos/dkrcp/blob/master/alias_Install.sh).
+ 
+#####Development Environment
+  * Ubuntu 12.04
+  * GNU Bash 4.2.25(1)-release
+  * Docker Engine 1.9.1
 
 ####Testing
 Execution of ```dkrcp```'s test program: ```dkrcp_Test.sh```, ensures its proper operation within its installed host environment.  Since ```dkrcp_Test.sh``` must affect the local repository to verify ```dkrcp```'s operation, it first performs a scan of the local environment to determine if its produced artifacts overlap existing file system and Docker repository ones.  The scan operation will generate a report and terminate testing upon detection of overlapping artifacts.  Please note that all testing artifact names begin with the ```dkrcp_test``` namespace, so it's unlikely image or file names in the host environment will collide with ones generated during testing.
