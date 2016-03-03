@@ -661,7 +661,7 @@ target_type_simple(){
     fi
     false
   }
-  target_obj_Create(){
+  _target_obj_common_Create(){
     local -r targetArg="$2"
     local -r targetObj_ref="$3"
     eval $targetObj_ref\[objRef\]\=\"\$targetArg\"
@@ -669,6 +669,9 @@ target_type_simple(){
     target_obj_type_Get 'objType'
     local -r objType
     eval $targetObj_ref\[objType\]\=\"\$objType\"
+  }
+  target_obj_Create(){
+    _target_obj_common_Create "$@"
   }
   target_obj_type_Get(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
@@ -763,6 +766,21 @@ target_type_containerfilepath(){
   target_type_simple
   target_compatibility_Check(){
     type_valid_AllIs "$1"
+  }
+  target_obj_Create(){
+    _target_obj_common_Create "$@"
+    target_type_filepath "$1"
+    local containerArg
+    target_obj_docker_arg_Get "$3" 'containerArg'
+    local -r containerArg
+    local nameUUID
+    local filePath
+    container_nameUUID_filepath_Extract "$containerArg" 'nameUUID' 'filePath'
+    local -r nameUUID
+    local -r filePath
+    if ! docker inspect --type=container --format='{{.Id}}' -- nameUUID >/dev/null 2>/dev/null; then
+      ScriptUnwind "$LINENO" "TARGET container must exist.  Could not find: '$nameUUID'."
+    fi
   }
   target_obj_type_Get(){
     eval $1\=\'\containerfilepath\'
@@ -1211,7 +1229,6 @@ arg_type_format_decide() {
     return 1
   done
   eval $typeName_ref\=\$typeName
-  return 0
 }
 ##############################################################################
 ##
@@ -1242,14 +1259,38 @@ container_filepath_IsDir(){
   local -r containerFilePath
   docker cp "$containerFilePath" - >/dev/null 2>/dev/null
 }
-
+##############################################################################
+##
+##  Purpose:
+##    Extract the container name/UUID from its concatenated 'containerfilepath'.
+##
+##  Assumes:
+##    ':' separates the container name/uuid from file path.
+##
+##  Input:
+##    $1 - A name/UUID delimited by ':' from a concatenated file path.
+##    $2 - A variable name to receive just the name or UUID portion.
+##    $3 - A varialbe name to receive just the file path portion.
+##    
+##  Output:
+##    When Success:
+##    $2 - Updated variable whose value reflects only the container name/UUID.
+##    $3 - Updated arialbe whose value reflects only the file path portion.
+##
+###############################################################################
+container_nameUUID_filepath_Extract(){
+  local -r nameUUIDfilepath="$1"
+  local -r nameUUIDvalue_ref="$2"
+  local -r filepathvalue_ref="$3"
+  nameUUID_filepath_Extract "$1" ':' "$REG_EX_CONTAINER_NAME_UUID" "$nameUUIDvalue_ref" "$filepathvalue_ref"
+}
 ##############################################################################
 ##
 ##  Purpose:
 ##    Extract the image name/UUID from its concatenated 'imagefilepath'.
 ##
 ##  Assumes:
-##    A two '::' separate the image name/uuid from file path.
+##    '::' separates the image name/uuid from file path.
 ##
 ##  Input:
 ##    $1 - A name/UUID delimited by '::' from a concatenated file path.
@@ -1266,14 +1307,39 @@ image_nameUUID_filepath_Extract(){
   local -r nameUUIDfilepath="$1"
   local -r nameUUIDvalue_ref="$2"
   local -r filepathvalue_ref="$3"
+  nameUUID_filepath_Extract "$1" '::' "$REG_EX_REPOSITORY_NAME_UUID" "$nameUUIDvalue_ref" "$filepathvalue_ref"
+}
+##############################################################################
+##
+##  Purpose:
+##    Extract name/UUID from its concatenated argument form.
+##
+##  Input:
+##    $1 - A name/UUID delimited by $2 from a concatenated file path.
+##    $2 - Delimiter values separating name/UUID from file path.
+##    $3 - Regex expression to verify the name/UUID
+##    $4 - A variable name to receive just the name or UUID portion.
+##    $5 - A varialbe name to receive just the file path portion.
+##    
+##  Output:
+##    When Success:
+##    $4 - Updated variable whose value reflects only the name/UUID.
+##    $5 - Updated arialbe whose value reflects only the file path portion.
+##
+###############################################################################
+nameUUID_filepath_Extract(){
+  local -r nameUUIDfilepath="$1"
+  local -r nameDelimiter="$2"
+  local -r nameUUIDreEx="$3"
+  local -r nameUUIDvalue_ref="$4"
+  local -r filepathvalue_ref="$5"
 
-  [[ $nameUUIDfilepath =~ (${REG_EX_REPOSITORY_NAME_UUID})::(.*$) ]]
+  [[ $nameUUIDfilepath =~ (${nameUUIDreEx})${nameDelimiter}(.*$) ]]
   if [ -z "${BASH_REMATCH[1]}" ]; then
-    ScriptUnwind "$LINENO" "Extraction of image name/UUID failed. Arg Value: '${BASH_REMATCH[1]}', RegEx: '$REG_EX_REPOSITORY_NAME_UUID'."
+    ScriptUnwind "$LINENO" "Extraction of name/UUID failed. Arg Value: '${BASH_REMATCH[1]}', RegEx: '$nameUUIDreEx'."
   fi
   eval $nameUUIDvalue_ref=\"\$\{BASH_REMATCH\[\1\]\}\"
   eval $filepathvalue_ref=\"\$\{BASH_REMATCH\[\6\]\}\"
-  return 0
 }
 ##############################################################################
 ##
