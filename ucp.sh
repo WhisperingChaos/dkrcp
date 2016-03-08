@@ -1,4 +1,3 @@
-#TODO: Add Digest support.
 #TODO: remove ScriptDebug messages.
 #TODO: support import as a mechanism to create images --upc-import
 #TODO: convert to more standard oo implementation
@@ -1257,7 +1256,6 @@ container_filepath_IsDir(){
     containerFilePath+='/.'
   fi
   local -r containerFilePath
-  ScriptDebug "$LINENO" "$containerFilePath"
   docker cp "$containerFilePath" - >/dev/null 2>/dev/null
 }
 ##############################################################################
