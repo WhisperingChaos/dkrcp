@@ -26,11 +26,6 @@
 ##
 ###############################################################################
 declare -A argTargetObj=()
-
-#TODO: locate an include file providing frequently needed functions.
-ref_simple_value_Set(){
-  eval $1=\"\$2\"
-}
 ##############################################################################
 ##
 ##  Purpose:
@@ -448,6 +443,23 @@ source_type_interface(){
   ##############################################################################
   ##
   ##  Purpose:
+  ##    Set a source docker cp argument.
+  ##
+  ##  Input:
+  ##    $1 - This pointer - associative map variable name of the type that 
+  ##         supports this interface.
+  ##    $2 - Docker argument value.
+  ##
+  ##  Output:
+  ##    $1 - Updated to reflect the docker cp argument value.
+  ##
+  ###############################################################################
+  _source_obj_docker_arg_Set(){
+    eval $1\[objRef\]\=\"\$2\"
+  }
+  ##############################################################################
+  ##
+  ##  Purpose:
   ##    Liberate any resources held by the source object/argument type.
   ##
   ##  Input:
@@ -471,11 +483,30 @@ source_type_simple(){
   source_obj_Create(){
     local -r sourceArg="$2"
     local -r sourceObj_ref="$3"
-    eval $sourceObj_ref\[objRef\]\=\"\$sourceArg\"
+    _source_obj_docker_arg_Set "$sourceObj_ref" "$sourceArg"
     local objType
     source_obj_type_Get 'objType'
     local -r objType
     eval $sourceObj_ref\[objType\]\=\"\$objType\"
+    _source_type_create_Inject "$sourceObj_ref"
+  }
+  ##############################################################################
+  ##
+  ##  Purpose:
+  ##    Provide a means to inject additional creation code to supplement
+  ##    the common create code.
+  ##
+  ##  Input:
+  ##    $1 - Variable name representing an associative map of all
+  ##         option and argument values keyed by the option/argument names.
+  ##
+  ##  Output:
+  ##    $1 - An updated associative map containig values for 
+  ##         both public and private property values.
+  ##
+  ###############################################################################
+  _source_type_create_Inject(){
+    true
   }
   source_obj_type_Get(){
     ScriptUnwind "$LINENO"  "Please override '$FUNCNAME'"
@@ -550,6 +581,23 @@ target_type_interface(){
   ###############################################################################
   target_obj_docker_arg_Get(){
     AssociativeMapAssignIndirect "$1" 'objRef' "$2"
+  }
+  ##############################################################################
+  ##
+  ##  Purpose:
+  ##    Assign a target docker cp argument.
+  ##
+  ##  Input:
+  ##    $1 - This pointer - associative map variable name of the type that 
+  ##         supports this interface.
+  ##    $2 - Argument file path specification to be assigned.
+  ##
+  ##  Output:
+  ##    $1 - Updated to reflect the docker cp argument value.
+  ##
+  ###############################################################################
+  _target_obj_docker_arg_Set(){
+    eval $1\[objRef\]\=\"\$2\"
   }
   ##############################################################################
   ##
@@ -659,7 +707,7 @@ target_type_simple(){
   _target_obj_common_Create(){
     local -r targetArg="$2"
     local -r targetObj_ref="$3"
-    eval $targetObj_ref\[objRef\]\=\"\$targetArg\"
+    _target_obj_docker_arg_Set "$targetObj_ref" "$targetArg"
     local objType
     target_obj_type_Get 'objType'
     local -r objType
@@ -755,6 +803,19 @@ source_type_containerfilepath(){
   source_obj_type_Get(){
     eval $1\=\'\containerfilepath\'
   }
+  _source_type_create_Inject(){
+    local -r sourceObj_ref="$1"
+    local containerArg
+    source_obj_docker_arg_Get "$sourceObj_ref" 'containerArg'
+    local nameUUID
+    local filePath
+    container_nameUUID_filepath_Extract "$containerArg" 'nameUUID' 'filePath'
+    local -r nameUUID
+    local -r filePath
+    default_filepath_Normalize "$nameUUID" "$filePath" 'containerArg'
+    local -r containerArg
+   _source_obj_docker_arg_Set "$sourceObj_ref" "$containerArg"
+  }
 }
 ###############################################################################
 target_type_containerfilepath(){
@@ -766,12 +827,14 @@ target_type_containerfilepath(){
     _target_obj_common_Create "$@"
     local containerArg
     target_obj_docker_arg_Get "$3" 'containerArg'
-    local -r containerArg
     local nameUUID
     local filePath
     container_nameUUID_filepath_Extract "$containerArg" 'nameUUID' 'filePath'
+    default_filepath_Normalize "$nameUUID" "$filePath" 'containerArg'
     local -r nameUUID
     local -r filePath
+    local -r containerArg
+    _target_obj_docker_arg_Set "$3" "$containerArg"
     if ! docker inspect --type=container --format='{{.Id}}' -- $nameUUID >/dev/null 2>/dev/null; then
       ScriptUnwind "$LINENO" "TARGET container must exist.  Could not find: '$nameUUID'."
     fi
@@ -804,7 +867,6 @@ source_type_imagefilepath(){
     local -r optArgMap_ref="$1"
     local -r sourceArg="$2"
     local -r sourceObj_ref="$3"
-
     local nameResolveReg
     AssociativeMapAssignIndirect "$optArgMap_ref" '--ucpchk-reg' 'nameResolveReg'
     local -r nameResolveReg
@@ -817,21 +879,19 @@ source_type_imagefilepath(){
     if ! image_normalized_label_instance_Exists "$imageNameUUID" "$nameResolveReg" 'imageNameUUID' 'imageNmRepoIs'; then
       ScriptUnwind "$LINENO" "SOURCE image must exist. Could not locate: '$imageNameUUID'."
     fi
-    local -r imageNmRepoIs
     local -r imageNameUUID
+    local -r imageNmRepoIs
     # create a container from the source image.
     local sourceContainer
     local entryPtNullify
-    # due to Docker issue #20972 introduced by 1.10 the following call must occur
-    # after image_normalized_label_instance_Exists in order to prefix image UUIDs
-    # entered by the user with 'sha256:' digest prefix, otherwise, later docker rmi
-    # will fail if complete UUID without digest prefix was specified by the user.
     image_container_Create "$imageNameUUID" 'sourceContainer' 'entryPtNullify'
     local -r sourceContainer
     local -r entryPtNullify
-    local -r sourceRef="${sourceContainer}:${imageFilePath}"
     # update source object standard properties.
-    eval $sourceObj_ref\[objRef\]\=\"\$\sourceRef\"
+    local sourceRef
+    default_filepath_Normalize "${sourceContainer}" "$imageFilePath" 'sourceRef'
+    local -r sourceRef
+    _source_obj_docker_arg_Set "$sourceObj_ref" "$sourceRef"
     eval $sourceObj_ref\[objType\]\=\'imagefilepath\'
     # update source object derived properties.
     eval $sourceObj_ref\[sourceContainer\]\=\"\$sourceContainer\"
@@ -865,19 +925,24 @@ target_type_imagefilepath(){
     local imageNameUUID
     local imageFilePath
     image_nameUUID_filepath_Extract "$argTarget" 'imageNameUUID' 'imageFilePath'
+    local -r imageFilePath
     local imageNmRepoIs
     if ! image_normalized_label_instance_Exists "$imageNameUUID" "$nameResolveReg" 'imageNameUUID' 'imageNmRepoIs'; then
       # target image doesn't exist create new image.
       image_Create "$imageNameUUID"
       eval $targetObj_ref\[ImageIsNew\]\=\"\true\"
     fi
+    local -r imageNameUUID
     # convert image into container.
     local targetContainer
     local entryPtNullify
     image_container_Create "$imageNameUUID" 'targetContainer' 'entryPtNullify'
     local -r targetContainer
     # update target object standard properties.
-    eval $targetObj_ref\[objRef\]\=\"\$\{targetContainer\}\:\$\{imageFilePath\}\"
+    local containerArgNorm
+    default_filepath_Normalize "$targetContainer" "$imageFilePath" 'containerArgNorm'
+    local -r containerArgNorm
+    _target_obj_docker_arg_Set "$targetObj_ref" "$containerArgNorm"
     eval $targetObj_ref\[objType\]\=\'imagefilepath\'
     # update target object derived properties.
     eval $targetObj_ref\[targetContainer\]\=\"\$targetContainer\"
@@ -1282,6 +1347,35 @@ container_nameUUID_filepath_Extract(){
   local -r nameUUIDvalue_ref="$2"
   local -r filepathvalue_ref="$3"
   nameUUID_filepath_Extract "$1" ':' "$REG_EX_CONTAINER_NAME_UUID" '0' "$nameUUIDvalue_ref" "$filepathvalue_ref"
+}
+##############################################################################
+##
+##  Purpose:
+##    According to docker cp, unspecified file paths for source/target
+##    containers default to root ('/').  However, when targeting a single
+##    file, docker cp fails when it should succeed (see Docker issue:#20926).
+##    This routine replaces unspecified file path with '/' to avert the
+##    anomaly.
+##
+##  Input:
+##    $1 - name/UUID.
+##    $2 - File path portion of a container/image file spec.
+##    $3 - Variable name to receive the complete file path specification.
+##    
+##  Output:
+##    When Success:
+##    $3 - Updated to receive the complete file path spec.
+##
+###############################################################################
+default_filepath_Normalize(){
+    local -r nameUUID="$1"
+    local -r filePath="$2"
+    local -r filePathSpec_ref="$3"
+    local filePathSpec_lvl="${nameUUID}:${filePath}"
+    if [ -z "$filePath" ]; then
+      filePathSpec_lvl+='/'
+    fi
+    ref_simple_value_Set "$filePathSpec_ref" "$filePathSpec_lvl"
 }
 ##############################################################################
 ##
