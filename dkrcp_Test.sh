@@ -744,6 +744,9 @@ dkrcp_arg_interface(){
   ##    $1 - This pointer - associative map variable name of the type that 
   ##         supports this interface.
   ##    $2 - A model's path.
+  ##    $3 - Mandatory when argument assumes role of a TARGET.  There are cases
+  ##         when the TARGET assumes the filename/directory name of the SOURCE.
+  ##         Specifically when copying to the default root ('/') directory.
   ##
   ##  Outputs:
   ##    $2 - Updated to reflect the write operation to the model.
@@ -1121,21 +1124,24 @@ dkrcp_arg_image_no_exist_impl(){
   dkrcp_arg_model_Write(){
     local -r this_ref="$1"
     local -r modelPath="$2"
+    local containerFilePath="$3"
     local imageName
     local imageFilePath
-    local argFileType
     _reflect_field_Get "$this_ref"      \
       'ImageName'        'imageName'    \
-      'ArgFileType'      'argFileType'  \
       'ArgFilePath'      'imageFilePath'
     local -r imageName
-    local -r argFileType
     local -r imageFilePath
+    if [ -z "$containerFilePath" ]; then
+      # acting as a SOURCE argument :: use its specified file path.
+      containerFilePath="$imageFilePath"
+    fi
+    local -r containerFilePath
     local containerID
     image_container_Create "$imageName" 'containerID'
     local -r containerID
-    if ! docker cp "$containerID:$imageFilePath" "$modelPath" >/dev/null; then
-      ScriptUnwind "$LINENO" "Failure when attempting to copy: '$imageFilePath' from container: '$containerID' derived from image: '$imageName' to model path: '$modelPath'."
+    if ! docker cp "$containerID:$containerFilePath" "$modelPath" >/dev/null; then
+      ScriptUnwind "$LINENO" "Failure when attempting to copy: '$containerFilePath' from container: '$containerID' derived from image: '$imageName' to model path: '$modelPath'."
     fi
     if ! docker rm $containerID >/dev/null; then
       ScriptUnwind "$LINENO" "Failure while deleting container: '$containerID' derived from image: '$imageName' after constructing model."
@@ -1496,11 +1502,18 @@ dkrcp_arg_container_exist_impl(){
   dkrcp_arg_model_Write(){
     local -r this_ref="$1"
     local -r modelPath="$2"
+    local containerFilePath="$3"
     local containerID
-    local containerFilePath
-    _reflect_field_Get "$this_ref"     \
-      'ContainerID'     'containerID'  \
-      'ArgFilePath'     'containerFilePath'
+    if [ -z "$containerFilePath" ]; then
+      # acting as a source argument
+      _reflect_field_Get "$this_ref"     \
+        'ContainerID'     'containerID'  \
+        'ArgFilePath'     'containerFilePath'
+    else
+      # acting as a target argument
+      _reflect_field_Get "$this_ref"     \
+        'ContainerID'     'containerID'
+    fi
     local -r containerID
     local -r containerFilePath
     if ! docker cp "$containerID:$containerFilePath" "$modelPath" >/dev/null; then
@@ -2028,11 +2041,13 @@ test_element_impl(){
     ##
     ###############################################################################
     _test_element_model_expected_Create(){
-      reflect_type_Active "$testTargetArg_ref"
       local argFilePathType
       local argFilePath
       local argFilePathExist
-      dkrcp_arg_model_settings_Get "$testTargetArg_ref" 'argFilePathType' 'argFilePath' 'argFilePathExist'
+      _test_element_model_target_filepath_Calculate 'argFilePathType' 'argFilePath' 'argFilePathExist'
+      local -r argFilePathType
+      local -r argFilePath
+      local -r argFilePathExist
       reflect_type_Active 'modelExpected'
       audit_model_path_write_Configure 'modelExpected' "$argFilePathType" "$argFilePath" "$argFilePathExist"
       local modelFilePath
@@ -2048,11 +2063,14 @@ test_element_impl(){
     ##
     ###############################################################################
     _test_element_model_result_Create(){
-      reflect_type_Active "$testTargetArg_ref"
       local argFilePathType
       local argFilePath
       local argFilePathExist
-      dkrcp_arg_model_settings_Get "$testTargetArg_ref" 'argFilePathType' 'argFilePath' 'argFilePathExist'
+      _test_element_model_target_filepath_Calculate 'argFilePathType' 'argFilePath' 'argFilePathExist'
+      local -r argFilePathType
+      local -r argFilePath
+      local -r argFilePathExist
+      #ScriptDebug "$LINENO" "argFilePath: '$argFilePath'"
       reflect_type_Active 'modelResult'
       # on successful cps the target exists and becomes the source.  Using this knowledge, create
       # a model target path so it creates the last directory and populates it with the content
@@ -2062,7 +2080,35 @@ test_element_impl(){
       audit_model_path_write_Get 'modelResult' 'modelFilePath'
       local -r modelFilePath
       reflect_type_Active "$testTargetArg_ref"
-      dkrcp_arg_model_Write "$testTargetArg_ref" "$modelFilePath"
+      dkrcp_arg_model_Write "$testTargetArg_ref" "$modelFilePath" "$argFilePath"
+    }
+    _test_element_model_target_filepath_Calculate(){
+      local -r argFilePathType_ref="$1"
+      local -r argFilePath_ref="$2"
+      local -r argFilePathExist_ref="$3"
+      reflect_type_Active "$testTargetArg_ref"
+      dkrcp_arg_model_settings_Get "$testTargetArg_ref" "$argFilePathType_ref" "$argFilePath_ref" "$argFilePathExist_ref"
+      local argFilePath_lcl
+      eval argFilePath_lcl\=\"\$$argFilePath_ref\"
+      while  [ -z "$argFilePath_lcl" ]; do
+        # TARGET wasn't specified
+        if (( ${#testSourceArgList[@]} > 1 )); then
+          # multi-source :: the only target in this situation is root.
+          ref_simple_value_Set "$argFilePathType_ref"  'd'
+          ref_simple_value_Set "$argFilePath_ref"      '/'
+          ref_simple_value_Set "$argFilePathExist_ref" 'true'
+          break
+        fi
+        if (( ${#testSourceArgList[@]} != 1 )); then
+          ScriptUnwind "$LINENO" "Should always have at least one SOURCE argument."
+        fi
+        # TARGET wasn't specified and single target :: assumes SOURCE filespec as TARGET.
+        local -r testSourceArg_ref="${testSourceArgList[0]}"
+        reflect_type_Active "$testSourceArg_ref"
+        dkrcp_arg_model_settings_Get "$testSourceArg_ref" "$argFilePathType_ref" "$argFilePath_ref" "$argFilePathExist_ref"
+        # ScriptDebug "$LINENO" "here" 
+        break
+      done
     }
     ###############################################################################
     ##
@@ -2177,15 +2223,12 @@ dkrcp_test_2(){
   }
 }
 ###############################################################################
-#  Although test 3 fails due to bug in Docker cp command, it currently passes.
-#  However it will fail once Docker fixes cp.
-###############################################################################
 dkrcp_test_3(){
   test_element_test_1_imp(){
     test_element_interface
     test_element_member_Def(){
       echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_a'       'f' 'a' 'file_content_reflect_name' "
-      echo " 'dkrcp_arg_image_no_exist_docker_bug_impl'      'imageNameTest'    'f' ''  'false' 'test_3' "
+      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTest'    'f' ''  'false' 'test_3' "
       echo " 'audit_model_impl'                              'modelExpected'    'modelexpected' "
       echo " 'audit_model_impl'                              'modelResult'      'modelresult' "
     }
