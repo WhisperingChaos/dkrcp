@@ -1,7 +1,3 @@
-source "MessageInclude.sh";
-source "ArgumentsGetInclude.sh";
-source "ArrayMapTestInclude.sh";
-source "VirtCmmdInterface.sh";
 #TODO: Add Digest support.
 #TODO: remove ScriptDebug messages.
 #TODO: support import as a mechanism to create images --upc-import
@@ -53,10 +49,10 @@ function VirtCmmdArgumentsParse () {
   ArgumentsParse "$1" "$2" "$3" 'ucpOptRepeatList' 'Argument'
 }
 VirtCmmdConfigSetDefault () {
-  REG_EX_UUID='^[a-fA-F0-9]+'
-  REG_EX_REPOSITORY_NAME_UUID='^([a-z0-9]([._-]?[a-z0-9]+)*/)*[a-z0-9]([._-]?[a-z0-9]+)*(:[A-Za-z0-9._-]*)?'
+  REG_EX_UUID='^(sha256:)?[a-fA-F0-9]+'
+  DIGEST_ID_PREFIX='sha256:'
+  REG_EX_REPOSITORY_NAME_UUID='^([a-z0-9]([._-]?[a-z0-9]+)*/)*(sha256:)?[a-z0-9]([._-]?[a-z0-9]+)*(:[A-Za-z0-9._-]*)?'
   REG_EX_CONTAINER_NAME_UUID='^[a-zA-Z0-9][a-zA-Z0-9_.-]*'
-  UUID_LEN_MAX='64'
   local -r tempDir="$(dirname "$(mktemp -u)")"
   if [ -z "$tempDir" ]; then 
     ScriptUnwind "$LINENO" "Unable to determine temp dir from: 'mktemp -u'."
@@ -769,7 +765,6 @@ target_type_containerfilepath(){
   }
   target_obj_Create(){
     _target_obj_common_Create "$@"
-    target_type_filepath "$1"
     local containerArg
     target_obj_docker_arg_Get "$3" 'containerArg'
     local -r containerArg
@@ -778,7 +773,7 @@ target_type_containerfilepath(){
     container_nameUUID_filepath_Extract "$containerArg" 'nameUUID' 'filePath'
     local -r nameUUID
     local -r filePath
-    if ! docker inspect --type=container --format='{{.Id}}' -- nameUUID >/dev/null 2>/dev/null; then
+    if ! docker inspect --type=container --format='{{.Id}}' -- $nameUUID >/dev/null 2>/dev/null; then
       ScriptUnwind "$LINENO" "TARGET container must exist.  Could not find: '$nameUUID'."
     fi
   }
@@ -828,6 +823,10 @@ source_type_imagefilepath(){
     # create a container from the source image.
     local sourceContainer
     local entryPtNullify
+    # due to Docker issue #20972 introduced by 1.10 the following call must occur
+    # after image_normalized_label_instance_Exists in order to prefix image UUIDs
+    # entered by the user with 'sha256:' digest prefix, otherwise, later docker rmi
+    # will fail if complete UUID without digest prefix was specified by the user.
     image_container_Create "$imageNameUUID" 'sourceContainer' 'entryPtNullify'
     local -r sourceContainer
     local -r entryPtNullify
@@ -1245,18 +1244,20 @@ arg_type_format_decide() {
 ###############################################################################
 container_filepath_IsDir(){
   local containerFilePath="$1"
-  [[ $containerFilePath =~ $REG_EX_CONTAINER_NAME_UUID(:.*) ]]
-  if (( ${#BASH_REMATCH[1]} < 3 )); then
-    # optimization when referring to root directory
-    if [ "${containerFilePath:(-1)}" == ':' ] ||  [ "${containerFilePath:(-1)}" == '/' ]; then
-      true
-      return
-    fi
+  
+  local nameUUID
+  local filePath
+  container_nameUUID_filepath_Extract "$containerFilePath" 'nameUUID' 'filePath'
+  # optimization when referring to root directory
+  if [ "$filePath"  == '/' ] || [ -z "$filePath" ]; then
+    true
+    return
   fi
-  if [ "${containerFilePath:(-2)}" != '/,' ]; then
+  if [ "${containerFilePath:(-1)}" != '/' ] && [ "${containerFilePath:(-2)}" != '/.' ]; then
     containerFilePath+='/.'
   fi
   local -r containerFilePath
+  ScriptDebug "$LINENO" "$containerFilePath"
   docker cp "$containerFilePath" - >/dev/null 2>/dev/null
 }
 ##############################################################################
@@ -1271,7 +1272,7 @@ container_filepath_IsDir(){
 ##    $1 - A name/UUID delimited by ':' from a concatenated file path.
 ##    $2 - A variable name to receive just the name or UUID portion.
 ##    $3 - A varialbe name to receive just the file path portion.
-##    
+##
 ##  Output:
 ##    When Success:
 ##    $2 - Updated variable whose value reflects only the container name/UUID.
@@ -1282,7 +1283,7 @@ container_nameUUID_filepath_Extract(){
   local -r nameUUIDfilepath="$1"
   local -r nameUUIDvalue_ref="$2"
   local -r filepathvalue_ref="$3"
-  nameUUID_filepath_Extract "$1" ':' "$REG_EX_CONTAINER_NAME_UUID" "$nameUUIDvalue_ref" "$filepathvalue_ref"
+  nameUUID_filepath_Extract "$1" ':' "$REG_EX_CONTAINER_NAME_UUID" '0' "$nameUUIDvalue_ref" "$filepathvalue_ref"
 }
 ##############################################################################
 ##
@@ -1307,7 +1308,7 @@ image_nameUUID_filepath_Extract(){
   local -r nameUUIDfilepath="$1"
   local -r nameUUIDvalue_ref="$2"
   local -r filepathvalue_ref="$3"
-  nameUUID_filepath_Extract "$1" '::' "$REG_EX_REPOSITORY_NAME_UUID" "$nameUUIDvalue_ref" "$filepathvalue_ref"
+  nameUUID_filepath_Extract "$nameUUIDfilepath" '::' "$REG_EX_REPOSITORY_NAME_UUID" '5' "$nameUUIDvalue_ref" "$filepathvalue_ref"
 }
 ##############################################################################
 ##
@@ -1318,28 +1319,30 @@ image_nameUUID_filepath_Extract(){
 ##    $1 - A name/UUID delimited by $2 from a concatenated file path.
 ##    $2 - Delimiter values separating name/UUID from file path.
 ##    $3 - Regex expression to verify the name/UUID
-##    $4 - A variable name to receive just the name or UUID portion.
-##    $5 - A varialbe name to receive just the file path portion.
+##    $4 - Parenthentical expressions in $3
+##    $5 - A variable name to receive just the name or UUID portion.
+##    $6 - A varialbe name to receive just the file path portion.
 ##    
 ##  Output:
 ##    When Success:
-##    $4 - Updated variable whose value reflects only the name/UUID.
-##    $5 - Updated arialbe whose value reflects only the file path portion.
+##    $5 - Updated variable whose value reflects only the name/UUID.
+##    $6 - Updated arialbe whose value reflects only the file path portion.
 ##
 ###############################################################################
 nameUUID_filepath_Extract(){
-  local -r nameUUIDfilepath="$1"
-  local -r nameDelimiter="$2"
-  local -r nameUUIDreEx="$3"
-  local -r nameUUIDvalue_ref="$4"
-  local -r filepathvalue_ref="$5"
+  local -r  nameUUIDfilepath="$1"
+  local -r  nameDelimiter="$2"
+  local -r  nameUUIDreEx="$3"
+  local -r parensInToFilePath="$4"
+  local -r  nameUUIDvalue_ref="$5"
+  local -r  filepathvalue_ref="$6"
 
   [[ $nameUUIDfilepath =~ (${nameUUIDreEx})${nameDelimiter}(.*$) ]]
   if [ -z "${BASH_REMATCH[1]}" ]; then
     ScriptUnwind "$LINENO" "Extraction of name/UUID failed. Arg Value: '${BASH_REMATCH[1]}', RegEx: '$nameUUIDreEx'."
   fi
   eval $nameUUIDvalue_ref=\"\$\{BASH_REMATCH\[\1\]\}\"
-  eval $filepathvalue_ref=\"\$\{BASH_REMATCH\[\6\]\}\"
+  eval $filepathvalue_ref=\"\$\{BASH_REMATCH\[\(\(\ \$parensInToFilePath\ \+\ \2 \)\)\]\}\"
 }
 ##############################################################################
 ##
@@ -1443,7 +1446,9 @@ image_Search(){
   local argIsUUID_lcl='false'
   while true; do
     if msgOut="$(docker inspect --type=image --format='{{ .Id }}' -- $imageNameUUID 2>&1;)"; then
-      if [[ $imageNameUUID =~ $REG_EX_UUID ]] && [ "$imageNameUUID" == "${msgOut:0:${#imageNameUUID}}" ]; then 
+      if [[ $imageNameUUID =~ $REG_EX_UUID ]] \
+        && (     [ "$imageNameUUID" == "${msgOut:0:${#imageNameUUID}}" ] \
+              || [ "$imageNameUUID" == "${msgOut:${#DIGEST_ID_PREFIX}:${#imageNameUUID}}" ] ); then 
         # string of hexidecimal characters and partial/full match when comparing the returned
         # image UUID to the supplied argument value :: high confidence source argument is a UUID
         # return the full UUID.
@@ -1453,7 +1458,8 @@ image_Search(){
       local -r UUIDout_lcl="$msgOut"
       break
     fi
-    if ! [[ $msgOut =~ ^Error:.No.such.image ]]; then
+    if ! [[ $msgOut =~ ^.*Error:.No.such.image ]]; then
+      single_quote_Encapsulate "$msgOut" 'msgOut'
       ScriptUnwind "$LINENO" "Unexpected failure: '$msgOut' from 'docker inspect' when testing for image with name/UUID: '$imageNameUUID'."
     fi
     # hopefully, calling agent knows that the provide reference is a valid repository name,
@@ -1535,7 +1541,7 @@ image_container_Create(){
 ##
 ###############################################################################
 image_Create(){
-  local -r imageNameUUID="$1"
+  local -r imageName="$1"
 
   dockerfile_stream(){
     echo "FROM scratch"
@@ -1546,12 +1552,11 @@ image_Create(){
   }
   # run a docker build to produce a default container - scratch is not completely empty.
   # suppress messages written to STDOUT and always, even if an error, remove intermediate containers
-  if ! docker build --force-rm -t $imageNameUUID - >/dev/null < <(dockerfile_stream); then
-    ScriptUnwind "$LINENO" "Build failed creating new version of destination image for: '$imageNameUUID'"
+  if ! docker build --force-rm -t $imageName - >/dev/null < <(dockerfile_stream); then
+    ScriptUnwind "$LINENO" "Build failed creating new version of destination image for: '$imageName'"
   fi
 }
 FunctionOverrideCommandGet
-source "ArgumentsMainInclude.sh";
 ###############################################################################
 # 
 # The MIT License (MIT)
