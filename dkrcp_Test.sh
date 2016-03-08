@@ -397,6 +397,44 @@ docker_commit_metadata_cmd_value_Map(){
   done
 }
 ###########################################################################
+#TODO: remove
+##
+##  Purpose:
+##    Extract the 64 byte UUID for an image/container.  Unfortunately, in 1.10
+##    Docker implemented a breaking change to its .Id format, that given
+##    what I know, didn't need to happen. This issue is addressed 
+##    by this function call (layer) to allow existing code, built before
+##    the breaking change was implemented, to retain its notion of
+##    a UUID.
+##
+##  Input:
+##    $1 - name or UUID to search for.
+##    $2 - type:
+##          'image'     - image namespace
+##          'container' - container namespace
+##    $3 - (optional)
+##
+###########################################################################
+#image_container_UUID_Get(){
+  #  local -r nameUUID="$1"
+  #  if [ -z "$2" ] then
+  #  local -r typeInspect='image'
+  #  else
+    #    local -r typeInspect="$2"
+  #  fi
+  #  local -r UUID_value_ref="$3"
+  #  local UUID_value_lcl
+  #  if ! UUID_value_lcl="$(docker inspect --type="$typeInspect" --format='{{ .Id }}' -- "$nameUUID" )"; then
+    #    return 1
+  #  fi
+  #  local -r UUID_value_lcl="${UUID_value_lcl#*:}
+  #  if [ -n "$UUID_value_ref" ]; then
+    #    ref_simple_value_Set "$UUID_value_ref" "$UUID_value_lcl"
+  #  else
+    #    echo "$UUID_value_lcl"
+  #  fi
+#}
+###########################################################################
 ##
 ##  Purpose:
 ##    Defines an interface to examine the environment for resources that
@@ -1110,6 +1148,7 @@ dkrcp_arg_image_no_exist_impl(){
     local imageName
     _reflect_field_Get "$this_ref" 'ImageName' 'imageName'
     local -r imageName
+    single_quote_Encapsulate "$dkrcpSTDOUT" 'dkrcpSTDOUT'
     PipeFailCheck 'docker inspect --type=image --format='"'{{ .Id }}'"' -- '"$imageName"' | grep '"$dkrcpSTDOUT"' >/dev/null' "$LINENO" "Expected imageUUID: '$dkrcpSTDOUT' to correspond to image name: '$imageName'."
   }
   dkrcp_arg_environ_Inspect(){
@@ -1136,7 +1175,8 @@ dkrcp_arg_image_no_exist_impl(){
     container_Clean "$imageName"
     local dockerMsg
     if ! dockerMsg="$(docker rmi -- $imageName 2>&1)"; then
-      if ! [[ $dockerMsg =~ ^Error.+:.could.not.find.image: ]] && ! [[ $dockerMsg =~ ^Error.+:.No.such.image.*$ ]]; then
+      if ! [[ $dockerMsg =~ ^Error.+:.could.not.find.image: ]] && ! [[ $dockerMsg =~ ^.*Error.+:.No.such.image.*$ ]]; then
+        single_quote_Encapsulate "$dockerMsg" 'dockerMsg' 
         ScriptUnwind "$LINENO" "Unexpected error: '$dockerMsg', when removing image name: '$imageName'."
       fi
     fi
@@ -1170,8 +1210,8 @@ dkrcp_arg_image_no_exist_impl(){
         ScriptDetectNotify "image: '$imageName'."
         break
       fi
-      local -r dockerMsg
-      if ! [[ $dockerMsg =~ ^Error:.No.such.image.*$ ]]; then
+      if ! [[ $dockerMsg =~ ^.*Error:.No.such.image.*$ ]]; then
+        single_quote_Encapsulate "$dockerMsg" 'dockerMsg' 
         ScriptUnwind "$LINENO" "Unexpected error: '$dockerMsg', when testing for image name: '$imageName'."
       fi
       return
@@ -1204,7 +1244,7 @@ dkrcp_arg_image_no_exist_target_bad_impl(){
   dkrcp_arg_environ_Inspect(){
     local -r this_ref="$1"
     local imageName
-    _reflect_field_Get "$this_ref" 'ImageName'   'imageName'
+    _reflect_field_Get "$this_ref" 'ImageName' 'imageName'
     local -r imageName
     if docker inspect --type=image -- $imageName >/dev/null 2>/dev/null; then 
       ScriptUnwind "$LINENO" "Image: '$imageName' should not exist but it does."
@@ -1229,7 +1269,8 @@ dkrcp_arg_image_no_exist_docker_bug_impl(){
     if docker images --no-trunc -- $imageName | grep "$dkrcpSTDOUT" >/dev/null; then
       ScriptUnwind "$LINENO" "Docker fixed cp bug replace 'dkrcp_arg_image_no_exist_docker_bug_impl' with 'dkrcp_arg_image_no_exist_impl'"
     fi
-    if ! [[ $dkrcpSTDOUT =~ .*no.such.directory ]]; then 
+    if ! [[ $dkrcpSTDOUT =~ .*no.such.directory ]]; then
+      single_quote_Encapsulate "$dkrcpSTDOUT" 'dkrcpSTDOUT'
       ScriptUnwind "$LINENO" "Expected existing docker cp bug to generate: 'no such directory' message but it produced: '$dkrcpSTDOUT'."
     fi
   }
@@ -1292,7 +1333,7 @@ dkrcp_arg_image_UUID_exist_impl(){
   ##    $6 - UUID length.  Optional iff source argument, otherwise
   ##         must be '' or a number. 
   ##    $7 - Derived image name.  Optional iff source argument,
-  ##         otherwise required
+  ##         otherwise required.
   ##
   ##  Outputs:
   ##    $1 - A constructed this pointer.
@@ -1337,8 +1378,13 @@ dkrcp_arg_image_UUID_exist_impl(){
     if ! imageUUID="$(docker inspect --type=image --format='{{ .Id }}' -- "$baseImageName")"; then
       ScriptUnwind "$LINENO" "Failed to obtain UUID for image: '$baseImageName'."
     fi
+    local -r SHA_PREFIX='sha256:'
     local -r imageUUID
-    ref_simple_value_Set "$imageFilePath_ref" "${imageUUID:0:$UUIDsize}::${imageFilePathValue}"
+    local -i shaPrefixLen=0
+    if [ "${imageUUID:0:${#SHA_PREFIX}}" == "$SHA_PREFIX" ]; then
+      shaPrefixLen="${#SHA_PREFIX}"
+    fi
+    ref_simple_value_Set "$imageFilePath_ref" "${imageUUID:0:$shaPrefixLen + $UUIDsize}::${imageFilePathValue}"
   }
   dkrcp_arg_output_Inspect(){
     local -r this_ref="$1"
@@ -1465,6 +1511,7 @@ dkrcp_arg_container_exist_impl(){
     local dkrcp_STDERR_STDOUT=''
     read -r dkrcp_STDERR_STDOUT
     if [ -n "$dkrcp_STDERR_STDOUT" ]; then
+      single_quote_Encapsulate "$dkrcpSTDOUT" 'dkrcpSTDOUT'
       ScriptUnwind "$LINENO"  "Unexpected response: '$dkrcp_STDERR_STDOUT' from dkrcp.  Expected no output."
     fi
   }
@@ -2395,35 +2442,7 @@ dkrcp_test_12(){
          "prefixed directory in its root."
   }
 }
-###############################################################################
-dkrcp_test_12(){
-  test_element_test_1_imp(){
-    test_element_interface
-    test_element_member_Def(){
-      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_a'    'd' ':dir_a'     'file_content_dir_create'  "
-      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_a'  'f' ':dir_a/a'   'file_content_reflect_name' "
-      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_b'  'f' ':dir_a/b'   'file_content_reflect_name' "
-      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_c'  'f' ':dir_a/c'   'file_content_reflect_name' "
-      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTest'     'd' ':dir_a'     'false' 'test_12:tagit' "
-      echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
-      echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
-    }
-    test_element_args_Catgry(){
-      testSourceArgList=(  'hostFile_dir_a' )
-      testDependArgList=(  'hostFile_dir_a_a' )
-      testDependArgList+=( 'hostFile_dir_a_b' )
-      testDependArgList+=( 'hostFile_dir_a_c' )
-      testTargetArg_ref='imageNameTest'
-    }
-  }
-  test_element_test_1_imp
-  dkrcp_test_Desc(){
-    echo "Create an image by copying a directory prefixed with a : to its"  \
-         "root directory.  Test ensures delimiter of ':::' doesn't confuse" \
-         "argument parser.  Outcome: Image should exist and have a colon"   \
-         "prefixed directory in its root."
-  }
-}
+
 ###############################################################################
 dkrcp_test_13(){
   test_element_test_1_imp(){
@@ -4141,6 +4160,35 @@ dkrcp_test_52(){
     echo "Update an existing container using its container name.  Copy"        \
          "a host file into an existing container target directory.  Outcome:"  \
          "container updated with host file directory."
+  }
+}
+###############################################################################
+dkrcp_test_53(){
+  test_element_test_1_imp(){
+    test_element_interface
+    test_element_member_Def(){
+      echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_dir_a'    'd' ':dir_a'     'file_content_dir_create'  "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_a'  'f' ':dir_a/a'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_b'  'f' ':dir_a/b'   'file_content_reflect_name' "
+      echo " 'hostfilepathname_dependent_impl'               'hostFile_dir_a_c'  'f' ':dir_a/c'   'file_content_reflect_name' "
+      echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTest'     'd' ':dir_a'     'false' 'test_53:tagit' "
+      echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+      echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+    }
+    test_element_args_Catgry(){
+      testSourceArgList=(  'hostFile_dir_a' )
+      testDependArgList=(  'hostFile_dir_a_a' )
+      testDependArgList+=( 'hostFile_dir_a_b' )
+      testDependArgList+=( 'hostFile_dir_a_c' )
+      testTargetArg_ref='imageNameTest'
+    }
+  }
+  test_element_test_1_imp
+  dkrcp_test_Desc(){
+    echo "Create an image by copying a directory prefixed with a : to its"  \
+         "root directory.  Test ensures delimiter of ':::' doesn't confuse" \
+         "argument parser.  Outcome: Image should exist and have a colon"   \
+         "prefixed directory in its root."
   }
 }
 ###############################################################################
