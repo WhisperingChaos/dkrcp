@@ -7,5 +7,10 @@ path_Set(){
   export PATH="$scriptDir:$PATH"
 }
 path_Set "${BASH_SOURCE[0]}"
+source "MessageInclude.sh";
+source "ArgumentsGetInclude.sh";
+source "ArrayMapTestInclude.sh";
+source "VirtCmmdInterface.sh";
 source 'ucp.sh'
+source "ArgumentsMainInclude.sh";
 
