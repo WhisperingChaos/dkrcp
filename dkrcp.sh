@@ -11,6 +11,7 @@ source "MessageInclude.sh";
 source "ArgumentsGetInclude.sh";
 source "ArrayMapTestInclude.sh";
 source "VirtCmmdInterface.sh";
-source 'ucp.sh'
+source "CommonInclude.sh";
+source "ucp.sh"
 source "ArgumentsMainInclude.sh";
 
