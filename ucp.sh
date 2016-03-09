@@ -52,15 +52,15 @@ VirtCmmdConfigSetDefault () {
     ScriptUnwind "$LINENO" "Unable to determine temp dir from: 'mktemp -u'."
   fi
   HOST_FILE_ROOT="${tempDir}/$(basename "${BASH_SOURCE[4]}")"
-  # note IMAGE_OPTION_FILTER and NON_SOURCE_NON_TARGET_ONLY_OPTIONS_ARGS must be synchronized with
+  # note IMAGE_OPTION_FILTER and SOURCE_ONLY_OPTIONS_ARGS must be synchronized with
   # the options/arguments defined with this program.  IMAGE_OPTION_FILTER defines
-  # filtering criteria to extract options from the command line when targeted images.  Currently
-  # these options include all options defined for docker commit.  NON_SOURCE_NON_TARGET_ONLY_OPTIONS_ARGS
-  # defines a filter to remove arguments and options.  The options removed are those that can be applied to
-  # both source and target.
+  # filtering criteria to extract options from the command line when targeting images.  Currently
+  # these options include those defined for docker commit.  SOURCE_ONLY_OPTIONS_ARGS
+  # defines a filter to remove all arguments, any options that maybe applicable to both
+  # source and target, and source only options.
   IMAGE_OPTION_FILTER='[[ $optArg =~ ^--change=[1-9][0-9]*$ ]] || [[ $optArg =~ ^-c=[1-9][0-9]*$ ]] || [ "$optArg" == "--author" ] || [ "$optArg" == "--message" ]'
-  NON_SOURCE_NON_TARGET_ONLY_OPTIONS_ARGS='[[ $optArg =~ ^Arg[1-9][0-9]*$ ]] || [ "$optArg" == "--help" ] || [ "$optArg" == "--version" ] || [ "$optArg" == "--ucpchk-reg" ]'
-  DOCKER_CP_OPTION_FILTER='[ "false" == "true" ]'
+  DOCKER_CP_OPTION_FILTER='[ "$optArg" == "--follow-link" ]'
+  SOURCE_ONLY_OPTIONS_ARGS='[[ $optArg =~ ^Arg[1-9][0-9]*$ ]] || [ "$optArg" == "--help" ] || [ "$optArg" == "--version" ] || [ "$optArg" == "--ucpchk-reg" ] || '"$DOCKER_CP_OPTION_FILTER"
 }
 ##############################################################################
 ##
@@ -69,7 +69,7 @@ VirtCmmdConfigSetDefault () {
 ##
 ##  Note:
 ##    When adding/updating/removing OPTIONS, the following option filters may
-##    Need to change: IMAGE_OPTION_FILTER, NON_SOURCE_NON_TARGET_ONLY_OPTIONS_ARGS
+##    Need to change: IMAGE_OPTION_FILTER, SOURCE_ONLY_OPTIONS_ARGS
 ##    and DOCKER_CP_OPTION_FILTER.
 ##
 ###############################################################################
@@ -97,6 +97,7 @@ OPTIONS:
     --change[],-c             Apply specified Dockerfile instruction(s) when
                                 TARGET is an image. see 'docker commit'
     --message="",-m           Apply commit message when TARGET is an image.
+    --follow-link=false,-L    Always follow symbolic link in SOURCE.
     --help=false,-h           Don't display this help message.
     --version=false           Don't display version info.
 
@@ -129,16 +130,17 @@ VERSION_DOC
 VirtCmmdOptionsArgsDef () {
 # optArgName cardinality default verifyFunction presence alias
 cat <<OPTIONARGS
-Arg1           single ''                "arg_type_format_Verify   '\\<Arg1\\>' "        required
-Arg2           single '-'               "arg_type_format_Verify   '\\<Arg2\\>' "        required
-ArgN           single ''                "arg_type_format_Verify   '\\<ArgN\\>' "        optional
---author       single ''                ''                                              optional '-a'
---change=N     single ''                ''                                              optional
--c=N           single ''                ''                                              optional
---message      single ''                ''                                              optional '-m'
---ucpchk-reg   single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--ucpchk-reg\\>'" required
---help         single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--help\\>'"       required "-h"
---version      single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--version\\>'"    required
+Arg1           single ''                "arg_type_format_Verify   '\\<Arg1\\>' "         required
+Arg2           single '-'               "arg_type_format_Verify   '\\<Arg2\\>' "         required
+ArgN           single ''                "arg_type_format_Verify   '\\<ArgN\\>' "         optional
+--author       single ''                ''                                               optional '-a'
+--change=N     single ''                ''                                               optional
+-c=N           single ''                ''                                               optional
+--message      single ''                ''                                               optional '-m'
+--follow-link  single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--follow-link\\>'" required '-L'
+--ucpchk-reg   single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--ucpchk-reg\\>'"  required
+--help         single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--help\\>'"        required "-h"
+--version      single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--version\\>'"     required
 OPTIONARGS
 }
 ###############################################################################
@@ -228,6 +230,7 @@ VirtCmmdExecute(){
     local sourceReference
     source_obj_docker_arg_Get 'argSourceObj' 'sourceReference'
     # execute in a sub-shell acts as a try/catch block
+    #ScriptDebug "$LINENO" "'$dockerCpOpts' '$argSourceType' '$sourceReference' '$argTargetType' '$targetReference'"
     if ! ( cp_strategy_Exec "$dockerCpOpts" "$argSourceType" "$sourceReference" "$argTargetType" "$targetReference"; ); then
       source_obj_Release 'argSourceObj'
       false
@@ -1059,7 +1062,7 @@ target_arg_only_options_Exclude(){
   local -a targetOnlyOptArgList
   local -A targetOnlyOptArgMap
   # remove source only options and any arguments.
-  if ! OptionsArgsFilter "$optArgList_ref" "$optArgMap_ref" 'targetOnlyOptArgList' 'targetOnlyOptArgMap' "$NON_SOURCE_NON_TARGET_ONLY_OPTIONS_ARGS" 'false'; then
+  if ! OptionsArgsFilter "$optArgList_ref" "$optArgMap_ref" 'targetOnlyOptArgList' 'targetOnlyOptArgMap' "$SOURCE_ONLY_OPTIONS_ARGS" 'false'; then
     ScriptUnwind "$LINENO" "Problem filtering target only options and arguments."
   fi
   if (( ${#targetOnlyOptArgList[@]} < 1 )); then
@@ -1091,7 +1094,8 @@ target_arg_only_options_Exclude(){
 ##         option and argument values keyed by the option/argument names.
 ##    $3 - Variable name to a string that will accept zero or more docker cp
 ##         options extracted from $1 & $2.
-##    DOCKER_CP_OPTION_FILTER - A bash boolean expression that selects
+##    DOCKER_CP_OPTION_FILTER - A bash boolean expression that selects docker cp
+##         options that are forwarded to the copy strategies.
 ##
 ##  Output:
 ##    $3 - updated to contain select command line options. 
@@ -1210,7 +1214,7 @@ cp_complex(){
     # only one error message that can be recovered from and it is issued by the second docker cp command,
     # these other messages can be safely ignored as the return code will reflect any failure in the pipleline.
     # not meant to be used outside its enclosing function.
-    eval docker cp $dockerCpOpts \"\$sourceArgDocker\" - 2>/dev/null | docker cp - "$targetArgDocker"
+    eval docker cp $dockerCpOpts \-\- \"\$sourceArgDocker\" - 2>/dev/null | docker cp  - "$targetArgDocker"
   }
   if dockedMsg="$(docker_stream_Copy "$dockerCpOpts" "$sourceArgDocker" "$targetArgDocker" 2>&1 )"; then
     return
@@ -1235,10 +1239,10 @@ cp_complex(){
   fi
   local successCopy='false'
   while true; do
-    if ! eval docker cp $dockerCpOpts \"\$sourceArgDocker\" \"\$tmpHostRefTarget\"\>\/dev\/null; then
+    if ! eval docker cp $dockerCpOpts \-\- \"\$sourceArgDocker\" \"\$tmpHostRefTarget\"\>\/dev\/null; then
       break
     fi
-    if ! docker cp "$tmpHostRefSource" "$targetArgDocker"; then
+    if ! eval docker cp $dockerCpOpts \-\- \"\$tmpHostRefSource\" \"\$targetArgDocker\"; then
       break
     fi
     successCopy='true'
