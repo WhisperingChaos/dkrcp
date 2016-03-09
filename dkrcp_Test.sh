@@ -2070,7 +2070,6 @@ test_element_impl(){
       local -r argFilePathType
       local -r argFilePath
       local -r argFilePathExist
-      #ScriptDebug "$LINENO" "argFilePath: '$argFilePath'"
       reflect_type_Active 'modelResult'
       # on successful cps the target exists and becomes the source.  Using this knowledge, create
       # a model target path so it creates the last directory and populates it with the content
@@ -2106,7 +2105,6 @@ test_element_impl(){
         local -r testSourceArg_ref="${testSourceArgList[0]}"
         reflect_type_Active "$testSourceArg_ref"
         dkrcp_arg_model_settings_Get "$testSourceArg_ref" "$argFilePathType_ref" "$argFilePath_ref" "$argFilePathExist_ref"
-        # ScriptDebug "$LINENO" "here" 
         break
       done
     }
