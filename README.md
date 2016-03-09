@@ -92,12 +92,12 @@ Since copying to an existing TARGET image first applies this operation to a deri
   * Execute a ```docker build``` using [```FROM scratch```](https://docs.docker.com/engine/userguide/eng-image/baseimages/#creating-a-simple-base-image-using-scratch).
   * Continue with [Copy *to* an *existing image*](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#copy-to-an-existing-image).
 
-######Interweaved Copying
+#####Interweaved Copying
 The behavior of ```dkrcp``` in situations where the same container assumes both SOURCE and TARGET roles is undefined and may change.  Preliminary testing indicates that non-overlapping directory references are copied as expected.  In fact, a fully overlapping root to root copy operation succeeds but no time has been invested to determine its correctness.  Therefore, exercise caution when copying between the same SOURCE and TARGET containers.  Fortunately copy operations involving the same SOURCE and TARGET image avert this uncertainty.
 
 When operating on the same SOURCE and TARGET image, ```dkrcp``` converts both to independent container instances.  The use of independent container prevents entanglement of the copy streams.  Therefore ```dkrcp```'s behavior should be identical to: copy from source container to host then copy from host to target container.
 
-######Permissions
+#####Permissions
 
 ####Install
 #####Dependencies
