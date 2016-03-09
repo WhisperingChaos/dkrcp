@@ -790,16 +790,16 @@ function OptionsArgsGen () {
     value=${value//\'/\'\"\'\"\'}
     value="'${value}'"
     if [[ "$optArg" =~ ^Arg[1-9][0-9]*$ ]]; then
-      argOutBuf="$argOutBuf $value";
+      argOutBuf+=" $value";
     else
       if [[ "$optArg" =~ ^(-[^=]+)=[1-9][0-9]*$ ]]; then
         # handle repeatable options
-        optOutBuf="$optOutBuf ${BASH_REMATCH[1]}"
+        optOutBuf+=" ${BASH_REMATCH[1]}"
       else
-        optOutBuf="$optOutBuf $optArg"
+        optOutBuf+=" $optArg"
       fi
       if [ "$value" != "''" ]; then
-        optOutBuf="$optOutBuf $value"
+        optOutBuf+="=$value"
       fi
     fi
   done
