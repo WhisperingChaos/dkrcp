@@ -26,6 +26,16 @@
 ##
 ###############################################################################
 declare -A argTargetObj=()
+
+###############################################################################
+#TODO: Encapsulate as a singleton.
+##
+##  Purpose:
+##    The variable ARG_OPTION_CONFIG exists globally to provide dynamic
+##    configuration of this program's behavior as a cross cutting concern. 
+##
+###############################################################################
+declare -A ARG_OPTION_CONFIG=()
 ##############################################################################
 ##
 ##  Purpose:
@@ -61,6 +71,88 @@ VirtCmmdConfigSetDefault () {
   IMAGE_OPTION_FILTER='[[ $optArg =~ ^--change=[1-9][0-9]*$ ]] || [[ $optArg =~ ^-c=[1-9][0-9]*$ ]] || [ "$optArg" == "--author" ] || [ "$optArg" == "--message" ]'
   DOCKER_CP_OPTION_FILTER='[ "$optArg" == "--follow-link" ]'
   SOURCE_ONLY_OPTIONS_ARGS='[[ $optArg =~ ^Arg[1-9][0-9]*$ ]] || [ "$optArg" == "--help" ] || [ "$optArg" == "--version" ] || [ "$optArg" == "--ucpchk-reg" ] || '"$DOCKER_CP_OPTION_FILTER"
+  ARG_OPTION_CONFIG[--follow-link]='false'
+  if TestDependenciesScanSuccess Testdependency_define_Docker_Client '1.10' >/dev/null 2>/dev/null; then
+    ARG_OPTION_CONFIG[--follow-link]='true'
+  fi
+}
+###############################################################################
+#TODO: Duplicate of code in TestFramework Module refactor
+##
+##  Purpose:
+##   Helping function to verify component dependencies exist and are of
+##   at least a minimal version.
+##
+##  Input:
+##    $1 - Function name that encapsulates the following interface:
+##           dependency_Exist
+##             Purpose:
+##               Determines if the component exists.
+##           dependency_version_Get
+##             Purpose:
+##               Obtains the component's version specifier.
+##           dependency_version_Violation_Gen       
+##             Purpose:
+##               Provides a message identifying the component
+##               and the version detected.
+##            Inputs:
+##              $1 - minimal version specifier.
+##              $2 - detected version specifier.
+##               
+##  Output:
+##    When successful:
+##      nothing.
+##    When failure:
+##      STDERR - Display informative message.
+##
+###############################################################################
+TestDependenciesScanSuccess(){
+  local -r dependencyDefineFunc="$1"
+  local -r dependencyMin="$2"
+  #load common interface to verify dependencies.
+  $dependencyDefineFunc
+ 
+  local localVer=''
+  local minDetectedVer=''
+  local depndSuccess='false'
+  while true; do 
+    if ! dependency_Exist; then
+      ScriptError "Dependency defined by: '$dependencyDefineFunc' not detected."
+      break
+    fi
+    if ! localVer="$(dependency_version_Get)"; then
+      ScriptError "Dependency defined by: '$dependencyDefineFunc' exists but unable to determine its version."
+      break
+    fi
+    if ! minDetectedVer="$(sort -V <( echo "$dependencyMin"; echo "$localVer") | head -n 1)"; then
+      break
+    fi
+    if [ "$minDetectedVer" != "$dependencyMin" ]; then 
+      dependency_version_Violation_Gen "$dependencyMin" "$localVer" 
+      break
+    fi
+    # same or newer version than desired minimum (oldest) version 
+    depndSuccess='true'
+    break
+  done
+  $depndSuccess
+}
+###############################################################################
+##
+##  Section:
+##   Common dependency checks.
+##
+###############################################################################
+Testdependency_define_Docker_Client(){
+  dependency_Exist(){
+    docker version -f "{{ .Client.Version }}" >/dev/null 2>/dev/null
+  }
+  dependency_version_Get(){
+    docker version -f "{{ .Client.Version }}" 2>/dev/null
+  }
+  dependency_version_Violation_Gen(){
+    ScriptError "Requires Docker Client version:'$1', detected:'$2'"
+  }
 }
 ##############################################################################
 ##
@@ -97,7 +189,13 @@ OPTIONS:
     --change[],-c             Apply specified Dockerfile instruction(s) when
                                 TARGET is an image. see 'docker commit'
     --message="",-m           Apply commit message when TARGET is an image.
+HELP_DOC
+if ${ARG_OPTION_CONFIG[--follow-link]}; then 
+cat <<HELP_DOC
     --follow-link=false,-L    Always follow symbolic link in SOURCE.
+HELP_DOC
+fi
+cat <<HELP_DOC
     --help=false,-h           Don't display this help message.
     --version=false           Don't display version info.
 
@@ -137,11 +235,15 @@ ArgN           single ''                "arg_type_format_Verify   '\\<ArgN\\>' "
 --change=N     single ''                ''                                               optional
 -c=N           single ''                ''                                               optional
 --message      single ''                ''                                               optional '-m'
---follow-link  single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--follow-link\\>'" required '-L'
 --ucpchk-reg   single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--ucpchk-reg\\>'"  required
 --help         single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--help\\>'"        required "-h"
 --version      single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--version\\>'"     required
 OPTIONARGS
+if ${ARG_OPTION_CONFIG[--follow-link]}; then 
+cat <<OPTIONARGS
+--follow-link  single false=EXIST=true  "OptionsArgsBooleanVerify '\\<--follow-link\\>'" required '-L'
+OPTIONARGS
+fi
 }
 ###############################################################################
 ##
