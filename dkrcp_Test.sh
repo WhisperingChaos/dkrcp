@@ -15,7 +15,6 @@ source "VirtCmmdInterface.sh";
 source "TestFramework.sh";
 source "ObjectReflectFramework.sh"
 source "CommonInclude.sh"
-
 ###############################################################################
 ##
 ##  Purpose:
@@ -66,7 +65,7 @@ TestEnvironentDependenciesAssert(){
   local depndSuccess='true'
   ! TestDependenciesScanSuccess 'dkrcp_dependency_define_Docker_Client' '1.8.0' && depndSuccess='false'
   ! TestDependenciesScanSuccess 'dkrcp_dependency_define_Diff'          '3.0'   && depndSuccess='false'
-  ! TestDependenciesScanSuccess 'Testdependency_define_Bash'            '4.'   && depndSuccess='false'
+  ! TestDependenciesScanSuccess 'Testdependency_define_Bash'            '4.0'   && depndSuccess='false'
   ! TestDependenciesScanSuccess 'dkrcp_dependency_dkrcp'                '0.5'   && depndSuccess='false'
   ! TestLocalRepositoryIsEmpty && depndSuccess='false'
   ! $depndSuccess && ScriptUnwind "$LINENO" "Detected problematic dependencies.  Repair or try '--no-depend'."
@@ -396,44 +395,6 @@ docker_commit_metadata_cmd_value_Map(){
     _reflect_field_Set "$metadataValueMap_ref" "${BASH_REMATCH[1]^^}" "${BASH_REMATCH[2]}"
   done
 }
-###########################################################################
-#TODO: remove
-##
-##  Purpose:
-##    Extract the 64 byte UUID for an image/container.  Unfortunately, in 1.10
-##    Docker implemented a breaking change to its .Id format, that given
-##    what I know, didn't need to happen. This issue is addressed 
-##    by this function call (layer) to allow existing code, built before
-##    the breaking change was implemented, to retain its notion of
-##    a UUID.
-##
-##  Input:
-##    $1 - name or UUID to search for.
-##    $2 - type:
-##          'image'     - image namespace
-##          'container' - container namespace
-##    $3 - (optional)
-##
-###########################################################################
-#image_container_UUID_Get(){
-  #  local -r nameUUID="$1"
-  #  if [ -z "$2" ] then
-  #  local -r typeInspect='image'
-  #  else
-    #    local -r typeInspect="$2"
-  #  fi
-  #  local -r UUID_value_ref="$3"
-  #  local UUID_value_lcl
-  #  if ! UUID_value_lcl="$(docker inspect --type="$typeInspect" --format='{{ .Id }}' -- "$nameUUID" )"; then
-    #    return 1
-  #  fi
-  #  local -r UUID_value_lcl="${UUID_value_lcl#*:}
-  #  if [ -n "$UUID_value_ref" ]; then
-    #    ref_simple_value_Set "$UUID_value_ref" "$UUID_value_lcl"
-  #  else
-    #    echo "$UUID_value_lcl"
-  #  fi
-#}
 ###########################################################################
 ##
 ##  Purpose:
