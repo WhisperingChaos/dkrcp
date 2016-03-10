@@ -4,7 +4,7 @@ Copy files between host's file system, containers, and images.
 [Copy Semantics](#copy-semantics)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Images as SOURCE/TARGET](#images-as-sourcetarget)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Interweaved Copying](#interweaved-copying)  
-&nbsp;&nbsp;&nbsp;&nbsp;[Permissions](permissions)  
+&nbsp;&nbsp;&nbsp;&nbsp;[Permissions](#permissions)  
 [Installing](#install)  
 [Testing](#testing)  
 [Motivation](#motivation)
