@@ -75,6 +75,14 @@ VirtCmmdConfigSetDefault () {
   if TestDependenciesScanSuccess Testdependency_define_Docker_Client '1.10' >/dev/null 2>/dev/null; then
     ARG_OPTION_CONFIG[--follow-link]='true'
   fi
+  ARG_OPTION_CONFIG[--Docker_1_8_bug]='false'
+  if ! TestDependenciesScanSuccess Testdependency_define_Docker_Client '1.9' >/dev/null 2>/dev/null; then
+    # failed 1.9+ test :: assume Docker 1.8
+    # bug in docker 1.8 would prevent deletion of image if container included a layer 
+    # that referenced an image's topmost layer even though the container was derived from 
+    # another image that was different but included the same image layer.
+    ARG_OPTION_CONFIG[--Docker_1_8_bug]='true'
+  fi
 }
 ###############################################################################
 #TODO: Duplicate of code in TestFramework Module refactor
@@ -332,7 +340,6 @@ VirtCmmdExecute(){
     local sourceReference
     source_obj_docker_arg_Get 'argSourceObj' 'sourceReference'
     # execute in a sub-shell acts as a try/catch block
-    #ScriptDebug "$LINENO" "'$dockerCpOpts' '$argSourceType' '$sourceReference' '$argTargetType' '$targetReference'"
     if ! ( cp_strategy_Exec "$dockerCpOpts" "$argSourceType" "$sourceReference" "$argTargetType" "$targetReference"; ); then
       source_obj_Release 'argSourceObj'
       false
@@ -1743,6 +1750,10 @@ image_Create(){
 
   dockerfile_stream(){
     echo "FROM scratch"
+    if ${ARG_OPTION_CONFIG[--Docker_1_8_bug]}; then 
+      # generates a unique image layer to prevent problems in 1.8
+      echo "MAINTAINER $( basename $(mktemp -u))"
+    fi
     # Set the working directory to root.  Innocoulus, so
     # default file system is established for an empty container.
     # Unfortunately, it consumes a layer.
