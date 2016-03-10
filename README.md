@@ -4,7 +4,7 @@ Copy files between host's file system, containers, and images.
 [Copy Semantics](#copy-semantics)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Images as SOURCE/TARGET](#images-as-sourcetarget)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Interweaved Copying](#interweaved-copying)  
-&nbsp;&nbsp;&nbsp;&nbsp;[Permissions](permissions)  
+&nbsp;&nbsp;&nbsp;&nbsp;[Permissions](#permissions)  
 [Installing](#install)  
 [Testing](#testing)  
 [Motivation](#motivation)
@@ -100,6 +100,7 @@ The behavior of ```dkrcp``` in situations where the same container assumes both 
 When operating on the same SOURCE and TARGET image, ```dkrcp``` converts both to independent container instances.  The use of independent container prevents entanglement of the copy streams.  Therefore ```dkrcp```'s behavior should be identical to: copy from source container to host then copy from host to target container.
 
 #####Permissions
+Since ```dkrcp``` wraps ```docker cp``` it applies file system permissions according to ```docker cp``` semantics.  ```docker cp``` currently replaces Linux ```UID:GID``` file system settings with the ```UID:GID``` of the account executing ```docker cp``` when copying from a container.  It then reverses this behavior when copying to a TARGET container, by replacing both the SOURCE ```UID:GID``` with the Linux root ID ('1').  Caution should be exercised as these permission semantics will eliminate custom ```UID:GID``` settings applied to SOURCE or TARGET file system objects.  The same permission semantics apply to images.  
 
 ####Install
 #####Dependencies
