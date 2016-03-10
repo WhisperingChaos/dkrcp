@@ -100,7 +100,7 @@ The behavior of ```dkrcp``` in situations where the same container assumes both 
 When operating on the same SOURCE and TARGET image, ```dkrcp``` converts both to independent container instances.  The use of independent container prevents entanglement of the copy streams.  Therefore ```dkrcp```'s behavior should be identical to: copy from source container to host then copy from host to target container.
 
 #####Permissions
-Since ```dkrcp``` wraps ```docker cp``` it applies file system permissions according to ```docker cp``` semantics.  ```docker cp``` currently replaces Linux UID and GID file system settings with the UID and GID of the account executing ```docker cp``` when copying from a container.  It then reverses this behavior when copying to a TARGET container, by replacing both the SOURCE UID and GID with the Linux root ID ('1').  Therefore, these permission semantics will eliminate custom file permissions applied to SOURCE or TARGET file system objects.  These same permission semantics apply to images.  
+Since ```dkrcp``` wraps ```docker cp``` it applies file system permissions according to ```docker cp``` semantics.  ```docker cp``` currently replaces Linux UID and GID file system settings with the UID and GID of the account executing ```docker cp``` when copying from a container.  It then reverses this behavior when copying to a TARGET container, by replacing both the SOURCE UID and GID with the Linux root ID ('1').  Caution should be exercised as these permission semantics will eliminate custom file permissions applied to SOURCE or TARGET file system objects.  The same permission semantics apply to images.  
 
 ####Install
 #####Dependencies
