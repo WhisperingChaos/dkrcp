@@ -10,7 +10,7 @@ Copy files between host's file system, containers, and images.
 [Motivation](#motivation)
 
 ```
-Usage: ./dkrcp.sh [OPTIONS] SOURCE [SOURCE]... TARGET 
+Usage:  [OPTIONS] SOURCE [SOURCE]... TARGET 
 
   SOURCE - Can be either: 
              host file path     : {<relativepath>|<absolutePath>}
@@ -31,8 +31,10 @@ OPTIONS:
     --change[],-c             Apply specified Dockerfile instruction(s) when
                                 TARGET is an image. see 'docker commit'
     --message="",-m           Apply commit message when TARGET is an image.
+    --follow-link=false,-L    Always follow symbolic link in SOURCE.
     --help=false,-h           Don't display this help message.
     --version=false           Don't display version info.
+
 ```
 
 Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandline/cp/) by:
