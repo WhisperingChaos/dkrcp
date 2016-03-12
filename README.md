@@ -117,7 +117,7 @@ Since ```dkrcp``` wraps ```docker cp``` it applies file system permissions accor
     * ```git clone``` to copy entire project contents including the git repository.  Obtains current master which may include untested features.
     * [```git archive```](https://www.kernel.org/pub/software/scm/git/docs/git-archive.html) to copy only the necessary project files without the git repository.  Archive can be selective by specifying tag or branch name.
     *  wget https://github.com/whisperingchaos/dkrcp/zipball/master creates a zip that includes only the project files without the git repository.  Obtains current master branch which may include untested features.
-  * Selectively add the 'dkrcp' alias by running [alias_Install.sh](https://github.com/WhisperingChaos/dkrcp/blob/master/alias_Install.sh).
+  * Selectively add the 'dkrcp' alias to the current shell by running ```source```[```alias_Install.sh```](https://github.com/WhisperingChaos/dkrcp/blob/master/alias_Install.sh).
  
 #####Development Environment
   * Ubuntu 12.04
