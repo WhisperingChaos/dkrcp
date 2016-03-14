@@ -200,7 +200,8 @@ OPTIONS:
 HELP_DOC
 if ${ARG_OPTION_CONFIG[--follow-link]}; then 
 cat <<HELP_DOC
-    --follow-link=false,-L    Always follow symbolic link in SOURCE.
+    --follow-link=false,-L    Follow symbolic link when link specified as a 
+                                SOURCE argument. Different from 'cp -aL'!
 HELP_DOC
 fi
 cat <<HELP_DOC
