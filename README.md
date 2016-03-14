@@ -5,6 +5,7 @@ Copy files between host's file system, containers, and images.
 &nbsp;&nbsp;&nbsp;&nbsp;[Images as SOURCE/TARGET](#images-as-sourcetarget)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Interweaved Copying](#interweaved-copying)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Permissions](#permissions)  
+&nbsp;&nbsp;&nbsp;&nbsp;[follow-link](#follow-link)  
 [Installing](#install)  
 [Testing](#testing)  
 [Motivation](#motivation)
@@ -24,6 +25,7 @@ Usage:  [OPTIONS] SOURCE [SOURCE]... TARGET
   container's/image's '/' (root).
 
 OPTIONS:
+OPTIONS:
     --ucpchk-reg=false        Don't pull images from registry. Limits image name
                                 resolution to Docker local repository for  
                                 both SOURCE and TARGET names.
@@ -31,19 +33,19 @@ OPTIONS:
     --change[],-c             Apply specified Dockerfile instruction(s) when
                                 TARGET is an image. see 'docker commit'
     --message="",-m           Apply commit message when TARGET is an image.
-    --follow-link=false,-L    Always follow symbolic link in SOURCE.
+    --follow-link=false,-L    Follow symbolic link when link specified as a 
+                                SOURCE argument. Different from 'cp -aL'!
     --help=false,-h           Don't display this help message.
     --version=false           Don't display version info.
-
 ```
 
 Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandline/cp/) by:
   * Facilitating image creation or adaptation by simply copying files.  When copying to an existing image, its state is unaffected, as copy preserves its immutability by creating a new layer.
-  * Enabling the specification of mutiple copy sources, including other images, to improve operational alignment with linux [```cp -a```](https://en.wikipedia.org/wiki/Cp_%28Unix%29) and minimize layer creation when TARGET refers to an image.
+  * Enabling the specification of multiple copy sources, including other images, to improve operational alignment with Linux [```cp -a```](https://en.wikipedia.org/wiki/Cp_%28Unix%29) and minimize layer creation when TARGET refers to an image.
   * Supporting the direct expression of copy semantics where SOURCE and TARGET arguments concurrently refer to containers.
  
 #### Copy Semantics
-```dkrcp``` relies on ```docker cp```, therefore, ```docker cp```'s [documentation](https://docs.docker.com/engine/reference/commandline/cp/) describes much of the expected behavior of ```dkrcp```, especially when specifying a single SOURCE argument.  Due to this reliance ```docker cp``` explinations concerning:
+```dkrcp``` relies on ```docker cp```, therefore, ```docker cp```'s [documentation](https://docs.docker.com/engine/reference/commandline/cp/) describes much of the expected behavior of ```dkrcp```, especially when specifying a single SOURCE argument.  Due to this reliance ```docker cp``` explanations concerning:
   * tarball streams ' - ',
   * container's root directory treated as the current one when copying to/from relative paths,
   * working directory of ```docker cp``` anchoring relative host file system paths,
@@ -54,7 +56,7 @@ Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandli
 
 are all applicable to ```dkrcp```.
 
-However, the following tabular form offers an equivalent description of copy behavior but visually different than the documention associated to ```docker cp```.
+However, the following tabular form offers an equivalent description of copy behavior but visually different than the document ion associated to ```docker cp```.
 
 |         | SOURCE File  | SOURCE Directory | [SOURCE Directory Content](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#source-directory-content-an-existing-directory-path-appended-with-) | SOURCE Stream |
 | :--:    | :----------: | :---------:| :----------: | :----------: |
@@ -71,9 +73,9 @@ However, the following tabular form offers an equivalent description of copy beh
 The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it a file, directory, or stream is successfully copied, as long as the TARGET refers to a preexisting directory, otherwise, the operation fails.
 
 ##### Images as SOURCE/TARGET
-A double colon '```::```' delimiter classifies the file path as referring to an image, differenciating it from the single one denoting a container reference.  Therefore, an argument referencing an image involving a tag would appear similar to: '```repository_name:tag::etc/hostname```'.
+A double colon '```::```' delimiter classifies the file path as referring to an image, differentiating it from the single one denoting a container reference.  Therefore, an argument referencing an image involving a tag would appear similar to: '```repository_name:tag::etc/hostname```'.
 
-When processing image arguments, ```dkrcp``` perfers binding to images known locally to Docker Engine that match the provided name and will ignore remote ones unless directed to include them.  To search remote registries, specify the option: ```--ucpchk-reg=true```.  Enabling this feature will cause ```dkrcp``` to initiate ```docker pull``` iff the specified image name is not locally known.  Note, when enabled, ```--ucpchk-reg``` applies to both SOURCE and TARGET image references. Therefore, in situations where the TARGET image name doesn't match a locally existing image but refers to an existing remote image, this remote image will be pulled and become the one referenced by TARGET.
+When processing image arguments, ```dkrcp``` prefers binding to images known locally to Docker Engine that match the provided name and will ignore remote ones unless directed to include them.  To search remote registries, specify the option: ```--ucpchk-reg=true```.  Enabling this feature will cause ```dkrcp``` to initiate ```docker pull``` iff the specified image name is not locally known.  Note, when enabled, ```--ucpchk-reg``` applies to both SOURCE and TARGET image references. Therefore, in situations where the TARGET image name doesn't match a locally existing image but refers to an existing remote image, this remote image will be pulled and become the one referenced by TARGET.
 
 Since copying to an existing TARGET image first applies this operation to a derived container (an image replica), its effects are "reversible".  Failures involving existing images simply delete the derived container leaving the repository unchanged.  However, when adding a new image to the local repository, the repository's state is first updated to reflect a [```scratch```](https://docs.docker.com/engine/userguide/eng-image/baseimages/#creating-a-simple-base-image-using-scratch) version of the image.  This ```scratch``` image is then updated in the same way as any existing TARGET image.  In this situation, a failure removes both the container and ```scratch``` image reverting the local repository's state.
 
@@ -103,6 +105,36 @@ When operating on the same SOURCE and TARGET image, ```dkrcp``` converts both to
 
 #####Permissions
 Since ```dkrcp``` wraps ```docker cp``` it applies file system permissions according to ```docker cp``` semantics.  ```docker cp``` currently replaces Linux ```UID:GID``` file system settings with the ```UID:GID``` of the account executing ```docker cp``` when copying from a container.  It then reverses this behavior when copying to a TARGET container, by replacing both the SOURCE ```UID:GID``` with the Linux root ID ('1').  Caution should be exercised as these permission semantics will eliminate custom ```UID:GID``` settings applied to SOURCE or TARGET file system objects.  The same permission semantics apply to images.  
+
+#####follow-link
+(```--follow-link,-L```)'s usual behavior replaces a symbolic link with with a physical copy of it's dereferenced object.  When coupled with ```cp -aL``` link replacement occurs for every element of the recursively produced list of subdirectories/files for a SOURCE argument that's a directory.  Currently, ```dkrcp```'s limits ```--follow-link``` behavior to only those symbolic links specified as SOURCE arguments.  Therefore, a SOURCE argument referencing a symbolic link that's associated to file is replaced by a copy of the file with similar behavior applied to a SOURCE argument symbolic link associated to a directory.  However, in situations involving a SOURCE argument referencing a symbolically linked directory, ```dkrcp``` eschews typical ```--forward-link``` behavior by failing to replace symbolic links of the SOURCE directory's recursively enumerated file and subdirectory symbolic links.  This behavior 
+```
+# host 'xlink' is a symbolic link to a directory.  this directory also contains
+# a symbolic link named 'xfilelink'. 
+
+root@d2c40c688111:/# ls -al xlink
+lrwxrwxrwx 1 root root 2 Mar 14 19:41 xlink -> /x
+root@d2c40c688111:/# cd xlink
+root@d2c40c688111:/xlink# ls -al
+total 8
+drwxr-xr-x  2 root root 4096 Mar 14 19:42 .
+drwxr-xr-x 42 root root 4096 Mar 14 19:41 ..
+-rw-r--r--  1 root root    0 Mar 14 19:35 xfile
+lrwxrwxrwx  1 root root    8 Mar 14 19:42 xfilelink -> /x/xfile
+
+# specify 'xlink' symbolic link as SOURCE argument to 'dkrcp' targeting a container.
+root@d2c40c688111:/# dkrcp --follow-link -- xlink d1b47bc8:/
+
+# result of '--follow-link' copy.  notice 'xlink' conversion to physical directory
+# but 'xfilelink' remains a link.  'xfilelink' would have been converted to a physical
+# file if 'dkrcp --follow-link' fully implemented 'cp -aL'.
+/ # ls -al xlink
+total 8
+drwxr-xr-x    2 root     root          4096 Mar 14 19:42 .
+drwxr-xr-x   18 root     root          4096 Mar 14 19:56 ..
+-rw-r--r--    1 root     root             0 Mar 14 19:35 xfile
+lrwxrwxrwx    1 root     root             8 Mar 14 19:42 xfilelink -> /x/xfile
+```
 
 ####Install
 #####Dependencies
@@ -146,8 +178,8 @@ Execution of ```dkrcp```'s test program: ```dkrcp_Test.sh```, ensures its proper
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application when creating the runtime image.
     * Use one or more Dockerfiles to generate the artifacts needed by the application.
     * Use ```dkrcp``` to copy the desired runtime artifacts from these containers/images and create the essential runtime image.
-  * Facilitates building applications by piplines that gradually incorporate Docker containers.
-    *  Existing build pipelines can replace locally installed build tool chains with Docker Hub provided build tool chain images, such as [golang](https://hub.docker.com/_/golang/).  The Docker Hub containerized versions potentially elimiate the need to physically install/configure a locally hosted tool chain and fully isolate build processes to ensure their repeatability.  Once a containerized build process completes, its desired artifacts can then be transferred from the resultant container/image to a host file result directory using ```dkrcp```.
+  * Facilitates building applications by pipelines that gradually incorporate Docker containers.
+    *  Existing build pipelines can replace locally installed build tool chains with Docker Hub provided build tool chain images, such as [golang](https://hub.docker.com/_/golang/).  The Docker Hub containerized versions potentially eliminate the need to physically install/configure a locally hosted tool chain and fully isolate build processes to ensure their repeatability.  Once a containerized build process completes, its desired artifacts can then be transferred from the resultant container/image to a host file result directory using ```dkrcp```.
   * Encapsulates the reliance on and encoding of several Docker CLI calls to implement the desired functionality insulating automation incorporating this utility from potentially future improved support by Docker community members through dkrcp's interface.
 
 ###License
