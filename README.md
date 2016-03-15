@@ -198,10 +198,10 @@ Hello World!
   * Select/create the desired directory to contain this project's git repository.
   * Use ```cd``` command to make this directory current.
   * Depending on what you wish to install execute:
-    * [```git clone```](https://help.github.com/articles/cloning-a-repository/) to copy entire project contents including the git repository.  Obtains current master which may include untested features.  To synchronize the working directory to reflect the desired release, use ```git checkout tags/<tag_name>```.
+    * [```git clone```](https://help.github.com/articles/cloning-a-repository/) to copy entire project contents including its git repository.  Obtains current master which may include untested features.  To synchronize the working directory to reflect the desired release, use ```git checkout tags/<tag_name>```.
     * [```git archive```](https://www.kernel.org/pub/software/scm/git/docs/git-archive.html) to copy only the necessary project files without the git repository.  Archive can be selective by specifying tag or branch name.
     *  wget https://github.com/whisperingchaos/dkrcp/zipball/master creates a zip that includes only the project files without the git repository.  Obtains current master branch which may include untested features.
-  * Selectively add the 'dkrcp' alias to the current shell by running ```source```[```alias_Install.sh```](https://github.com/WhisperingChaos/dkrcp/blob/master/alias_Install.sh).
+  * Selectively add the 'dkrcp' alias to the current shell by running ```source```[```./alias_Install.sh```](https://github.com/WhisperingChaos/dkrcp/blob/master/alias_Install.sh).
  
 #####Development Environment
   * Ubuntu 12.04
