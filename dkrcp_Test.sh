@@ -33,6 +33,7 @@ TestConfigSetDefault(){
   fi
   TEST_FILE_PREFIX="$TEST_NAME_SPACE"
   TEST_FILE_ROOT="$tempDir/${TEST_NAME_SPACE}tmp/"
+  TEST_SYMBOLIC_LINK_SUFFIX='_link'
 }
 ###############################################################################
 ##
@@ -85,6 +86,7 @@ dkrcp_dependency_define_Docker_Client(){
     ScriptError "Requires Docker Client version:'$1+' for 'docker cp' functionality.  Client version detected:'$2'."
   }
 }
+
 ###############################################################################
 ##
 ##  Purpose:
@@ -151,9 +153,29 @@ dkrcp_dependency_dkrcp(){
 ###############################################################################
 file_content_reflect_name(){
   if ! mkdir -p "$( dirname "$1")"; then
-    ScriptError "Unable to create directory path for file: '$1'"
+    ScriptError "Unable to create directory path for file: '$1'."
   elif ! echo "$1">"$1"; then
     ScriptError "Failed to create file content:'$1'."
+  fi
+}
+###############################################################################
+##
+##  Purpose:
+##    Create a link to a file/directory.
+##
+##  Input:
+##    $1 - Absolute path to the link's targeted file/directory.
+##
+##  Output:
+##    $1 - Absolute path to the link's targeted file/directory.
+###############################################################################
+symbolic_link(){
+  local -r symbolicLink="$1"
+  local -r targetName="${symbolicLink%$TEST_SYMBOLIC_LINK_SUFFIX}"
+  if ! mkdir -p "$( dirname "$symbolicLink")"; then
+    ScriptError "Unable to create directory path for link: '$symbolicLink'."
+  elif ! ln -s "$targetName" "$symbolicLink"; then
+    ScriptError "Unable to create link: '$symbolicLink' for file: '$targetName'."
   fi
 }
 ###############################################################################
@@ -705,9 +727,13 @@ dkrcp_arg_interface(){
   ##    $1 - This pointer - associative map variable name of the type that 
   ##         supports this interface.
   ##    $2 - A model's path.
-  ##    $3 - Mandatory when argument assumes role of a TARGET.  There are cases
-  ##         when the TARGET assumes the filename/directory name of the SOURCE.
+  ##    $3 - Must either '' or when argument assumes role as a TARGET the
+  ##         SOURCE file/directory name.  There are cases when the TARGET
+  ##         assumes the filename/directory name of the SOURCE.
   ##         Specifically when copying to the default root ('/') directory.
+  ##    $4 - Mandatory when argument assumes role as a SOURCE, otherwise,
+  ##         it's optional.  Conveys linux cp archive options.
+  ##
   ##
   ##  Outputs:
   ##    $2 - Updated to reflect the write operation to the model.
@@ -780,6 +806,9 @@ hostfilepathname_dependent_impl(){
   ##    $2 - The type of host file path:
   ##         'f' - file path resolves to a file.
   ##         'd' - file path resolves to a directory.
+  ##         'l' - a file of 'f' or 'd' is created with the name provided by
+  ##               $3, then the process continues by creating a link whose
+  ##               name is formed by adding a '_link' suffix.
   ##    $3 - dkrcp host file path.
   ##    $4 - A function name that generates $3's content.
   ##
@@ -794,7 +823,11 @@ hostfilepathname_dependent_impl(){
     local -r thisTypeName="$1"
     local -r this_ref="$2"
     local -r argFileType="$3"
-    local -r argFilePath="$4"
+    if [ "$argFileType" == 'l' ]; then
+      local -r argFilePath="$4${TEST_SYMBOLIC_LINK_SUFFIX}"
+    else
+      local -r argFilePath="$4"
+    fi
     local -r funcNameContentGen="$5"
     _reflect_type_Set "$this_ref" "$thisTypeName"
     local resourceFilePath
@@ -886,6 +919,8 @@ dkrcp_arg_hostfilepath_hostfilepathExist_impl(){
   dkrcp_arg_model_Write(){
     local -r this_ref="$1"
     local -r modelPath="$2"
+    local -r ignoreArg="$3"
+    local -r cpArchiveOpts="$4"
     local resourceFilePath
     local argFileSelector
     _reflect_field_Get "$this_ref"          \
@@ -893,7 +928,7 @@ dkrcp_arg_hostfilepath_hostfilepathExist_impl(){
       'ArgFileSelector'  'argFileSelector'
     local -r resourceFilePath
     local -r argFileSelector
-    cp -a "${resourceFilePath}${argFileSelector}" "$modelPath"
+    eval cp -a $cpArchiveOpts \"\$\{resourceFilePath\}\$\{argFileSelector\}\" \"\$modelPath\"
   }
   dkrcp_arg_output_Inspect(){
     local dkrcpSTDOUT
@@ -1086,6 +1121,7 @@ dkrcp_arg_image_no_exist_impl(){
     local -r this_ref="$1"
     local -r modelPath="$2"
     local containerFilePath="$3"
+    local -r cpArchiveOpts="$4"
     local imageName
     local imageFilePath
     _reflect_field_Get "$this_ref"      \
@@ -1101,7 +1137,7 @@ dkrcp_arg_image_no_exist_impl(){
     local containerID
     image_container_Create "$imageName" 'containerID'
     local -r containerID
-    if ! docker cp "$containerID:$containerFilePath" "$modelPath" >/dev/null; then
+    if ! eval docker cp $cpArchiveOpts \"\$containerID\:\$containerFilePath\" \"$modelPath\" \>\/dev\/null; then
       ScriptUnwind "$LINENO" "Failure when attempting to copy: '$containerFilePath' from container: '$containerID' derived from image: '$imageName' to model path: '$modelPath'."
     fi
     if ! docker rm $containerID >/dev/null; then
@@ -1115,6 +1151,9 @@ dkrcp_arg_image_no_exist_impl(){
     local imageName
     _reflect_field_Get "$this_ref" 'ImageName' 'imageName'
     local -r imageName
+    if [ -z "$dkrcpSTDOUT" ]; then
+      ScriptUnwind "$LINENO" "Expected imageUUID for '$imageName' but nothing generated as output."
+    fi
     single_quote_Encapsulate "$dkrcpSTDOUT" 'dkrcpSTDOUT'
     PipeFailCheck 'docker inspect --type=image --format='"'{{ .Id }}'"' -- '"$imageName"' | grep '"$dkrcpSTDOUT"' >/dev/null' "$LINENO" "Expected imageUUID: '$dkrcpSTDOUT' to correspond to image name: '$imageName'."
   }
@@ -1464,6 +1503,7 @@ dkrcp_arg_container_exist_impl(){
     local -r this_ref="$1"
     local -r modelPath="$2"
     local containerFilePath="$3"
+    local -r cpArchiveOpts="$4"
     local containerID
     if [ -z "$containerFilePath" ]; then
       # acting as a source argument
@@ -1477,7 +1517,7 @@ dkrcp_arg_container_exist_impl(){
     fi
     local -r containerID
     local -r containerFilePath
-    if ! docker cp "$containerID:$containerFilePath" "$modelPath" >/dev/null; then
+    if ! eval docker cp $cpArchiveOpts \"\$containerID\:\$containerFilePath\" \"\$modelPath\" \>\/dev\/null; then
       ScriptUnwind "$LINENO" "Failure when attempting to copy: '$containerFilePath' from container: '$containerID' to model path: '$modelPath'."
     fi
   }
@@ -1998,6 +2038,39 @@ test_element_impl(){
     ###############################################################################
     ##
     ##  Purpose:
+    ##    Extract dkrcp options used to affect the 'cp -a' operation when
+    ##    processing dkrcp SOURCE arguments.  Transform them so they match what's
+    ##    required by 'cp -a'.
+    ##
+    ##  Input:
+    ##    $1 - Variable name to contain the retuned 'cp -a' option(s).
+    ##    test_element_cmd_options_Get - method which returns all specified dkrcp 
+    ##         options for current test.
+    ##
+    ##  Output:
+    ##    $1 - Variable set to 'cp -a' option values.
+    ##
+    ###############################################################################
+    _test_element_cp_archive_opts_Get(){
+       local -r cpArchiveOpts_ref="$1"
+       local cpArchiveOpts_lcl=' '
+       local dkrcpOpts
+       test_element_cmd_options_Get 'dkrcpOpts'
+       local -r dkrcpOpts
+       eval set -- $dkrcpOpts
+       while (( $# > 0 )); do
+         if [[ "$1" =~ ^-L(.*) ]] || [[ "$1" =~ ^--follow-link(.*) ]]; then
+       if [ -z "${BASH_REMATCH[1]}" ] || [[ ${BASH_REMATCH[1]} =~ .*true.* ]]; then
+             cpArchiveOpts_lcl+="-L "
+           fi
+         fi
+         shift
+       done
+       ref_simple_value_Set "$cpArchiveOpts_ref" "$cpArchiveOpts_lcl"
+    }
+    ###############################################################################
+    ##
+    ##  Purpose:
     ##    Create the expected model by simulating dkrcp commands.
     ##
     ###############################################################################
@@ -2014,7 +2087,10 @@ test_element_impl(){
       local modelFilePath
       audit_model_path_write_Get 'modelExpected' 'modelFilePath'
       local -r modelFilePath
-      _test_element_arg_source_Iter dkrcp_arg_model_Write "$modelFilePath"
+      local cpArchiveOpts
+      _test_element_cp_archive_opts_Get 'cpArchiveOpts'
+      local -r cpArchiveOpts
+      _test_element_arg_source_Iter dkrcp_arg_model_Write "$modelFilePath" '' "$cpArchiveOpts"
     }
     ###############################################################################
     ##
@@ -2105,6 +2181,7 @@ test_element_impl(){
       _test_element_model_expected_Create
       _test_element_model_result_Create
       _test_element_models_Compare
+      #ScriptDebug "$LINENO" "sleeping"
       #sleep 30
     fi
   }
@@ -4193,6 +4270,106 @@ dkrcp_test_53(){
          "prefixed directory in its root."
   }
 }
+define_docker_1_10_deratives_Testing(){
+  ###############################################################################
+  dkrcp_test_54(){
+    test_element_test_1_imp(){
+      test_element_interface
+      test_element_member_Def(){
+        echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_link_a'   'l' 'a'       'symbolic_link'  "
+        echo " 'hostfilepathname_dependent_impl'               'hostFile_a'        'f' 'a'       'file_content_reflect_name' "
+        echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTest'     'd' 'dev/pts'  'true' 'test_54' "
+        echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+        echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+      }
+      test_element_args_Catgry(){
+        testSourceArgList=(  'hostFile_link_a' )
+        testDependArgList=(  'hostFile_a' )
+        testTargetArg_ref='imageNameTest'
+      }
+      test_element_cmd_options_Get(){
+        ref_simple_value_Set "$1" '--follow-link'
+      }
+    }
+    test_element_test_1_imp
+    dkrcp_test_Desc(){
+      echo "Create an image by copying a linked host file into an existing"    \
+           "target directory.  Outcome: Link should be dereferenced and file"  \
+           "with target name should exist in image's target directory."
+    }
+  }
+  ###############################################################################
+  dkrcp_test_55(){
+    test_element_test_1_imp(){
+      test_element_interface
+      test_element_member_Def(){
+        echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_link_a'   'l' 'a'       'symbolic_link'  "
+        echo " 'hostfilepathname_dependent_impl'               'hostFile_a'        'f' 'a'       'file_content_reflect_name' "
+        echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameTest'     'd' 'dev/pts'  'true' 'test_55' "
+        echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+        echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+      }
+      test_element_args_Catgry(){
+        testSourceArgList=(  'hostFile_link_a' )
+        testDependArgList=(  'hostFile_a' )
+        testTargetArg_ref='imageNameTest'
+      }
+    }
+    test_element_test_1_imp
+    dkrcp_test_Desc(){
+      echo "Create an image by copying a linked host file into an existing" \
+           "target directory.  Outcome: Link should remain a link and"      \
+           "exist in image's target directory."
+    }
+  }
+  ###############################################################################
+  dkrcp_test_56(){
+    test_element_test_1_imp(){
+      test_element_interface
+      test_element_member_Def(){
+        echo " 'dkrcp_arg_hostfilepath_hostfilepathExist_impl' 'hostFile_link_a'   'l' 'a'       'symbolic_link'  "
+        echo " 'hostfilepathname_dependent_impl'               'hostFile_a'        'f' 'a'       'file_content_reflect_name' "
+        echo " 'dkrcp_arg_image_no_exist_impl'                 'imageNameSource'   'd' 'dev/pts'  'true' 'test_56_source' "
+        echo " 'audit_model_impl'                              'modelExpected'     'modelexpected' "
+        echo " 'audit_model_impl'                              'modelResult'       'modelresult' "
+      }
+      test_element_args_Catgry(){
+        testSourceArgList=(  'hostFile_link_a' )
+        testDependArgList=(  'hostFile_a' )
+        testTargetArg_ref='imageNameSource'
+      }
+    }
+    test_element_test_2_imp(){
+      test_element_interface
+      test_element_member_Def(){
+        echo " 'dkrcp_arg_image_exist_impl'                    'imageNameSource2'  'f' '/dev/pts/a${TEST_SYMBOLIC_LINK_SUFFIX}' 'true'  'test_56_source' "
+        echo " 'dkrcp_arg_image_no_exist_target_bad_impl'      'imageNameTarget'  'd' 'dev/pts'  'true' 'test_56_target' '^Abort: Module.+Unexpected.failure.detected.during.streamed.piped' "
+        echo " 'audit_model_impl'                              'modelExpected'     'modelexpected_2' "
+        echo " 'audit_model_impl'                              'modelResult'       'modelresult_2' "
+      }
+      test_element_args_Catgry(){
+        testSourceArgList=(  'imageNameSource2' )
+        testTargetArg_ref='imageNameTarget'
+      }
+      test_element_prequisite_test_Def(){
+        echo 'test_element_test_1_imp'
+        echo 'test_element_test_2_imp'
+      }
+      test_element_cmd_options_Get(){
+        ref_simple_value_Set "$1" '--follow-link'
+      }
+    }
+    test_element_test_2_imp
+    dkrcp_test_Desc(){
+      echo "Attempt to create an image by copying a linked file from a source image to the"  \
+           "targeted directory using the --follow-link option.  Outcome: deferencing link"   \
+           "causes failure because what it's pointing to doesn't exist."
+    }
+  }
+}
+if TestDependenciesScanSuccess 'dkrcp_dependency_define_Docker_Client' '1.10' 2>/dev/null; then
+  define_docker_1_10_deratives_Testing
+fi 
 ###############################################################################
 FunctionOverrideCommandGet
 source "ArgumentsMainInclude.sh";
