@@ -6,7 +6,7 @@ Copy files between host's file system, containers, and images.
 &nbsp;&nbsp;&nbsp;&nbsp;[Interweaved Copying](#interweaved-copying)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Permissions](#permissions)  
 &nbsp;&nbsp;&nbsp;&nbsp;[follow-link](#follow-link)  
-&nbsp;&nbsp;&nbsp;&nbsp;[follow-link](#examples)  
+&nbsp;&nbsp;&nbsp;&nbsp;[Examples](#examples)  
 [Installing](#install)  
 [Testing](#testing)  
 [Motivation](#motivation)
@@ -25,7 +25,6 @@ Usage:  [OPTIONS] SOURCE [SOURCE]... TARGET
   <relativepath> within the context of a container/image is relative to
   container's/image's '/' (root).
 
-OPTIONS:
 OPTIONS:
     --ucpchk-reg=false        Don't pull images from registry. Limits image name
                                 resolution to Docker local repository for  
@@ -57,7 +56,7 @@ Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandli
 
 are all applicable to ```dkrcp```.
 
-However, the following tabular form offers an equivalent description of copy behavior but visually different than the document ion associated to ```docker cp```.
+However, the following tabular form offers an equivalent description of copy behavior but visually different than the documention associated to ```docker cp```.
 
 |         | SOURCE File  | SOURCE Directory | [SOURCE Directory Content](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#source-directory-content-an-existing-directory-path-appended-with-) | SOURCE Stream |
 | :--:    | :----------: | :---------:| :----------: | :----------: |
@@ -83,7 +82,7 @@ Since copying to an existing TARGET image first applies this operation to a deri
 ######Copy *from* an *existing image*:
   * Convert the referenced image to a container via [```docker create```](https://docs.docker.com/engine/reference/commandline/create).
   * Copy from this container using ```docker cp```.
-  * Destroy this container using ```docker rm```.
+  * Destroy this container using [```docker rm```](https://docs.docker.com/engine/reference/commandline/rm/).
 
 ######Copy *to* an *existing image*:
   * Convert the referenced image to a container via ```docker create```.
@@ -100,15 +99,15 @@ Since copying to an existing TARGET image first applies this operation to a deri
   * Continue with [Copy *to* an *existing image*](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#copy-to-an-existing-image).
 
 #####Interweaved Copying
-The behavior of ```dkrcp``` in situations where the same container assumes both SOURCE and TARGET roles is undefined and may change.  Preliminary testing indicates that non-overlapping directory references are copied as expected.  In fact, a fully overlapping root to root copy operation succeeds but no time has been invested to determine its correctness.  Therefore, exercise caution when copying between the same SOURCE and TARGET containers.  Fortunately copy operations involving the same SOURCE and TARGET image avert this uncertainty.
+The behavior of ```dkrcp``` in situations where the same container assumes both SOURCE and TARGET roles is undefined and may change.  Preliminary testing indicates that non-overlapping directory references are copied as expected.  In fact, a fully overlapping root to root copy operation succeeds but no time has been invested to determine its correctness.  Therefore, exercise caution when copying between the same SOURCE and TARGET containers.  Copy operations involving the same SOURCE and TARGET image fortunately avert this uncertainty.
 
-When operating on the same SOURCE and TARGET image, ```dkrcp``` converts both to independent container instances.  The use of independent container prevents entanglement of the copy streams.  Therefore ```dkrcp```'s behavior should be identical to: copy from source container to host then copy from host to target container.
+When operating on the same SOURCE and TARGET image, ```dkrcp``` converts both to independent container instances.  The use of independent container prevents entanglement of the copy streams.  Therefore ```dkrcp```'s behavior (not its implementation) should be identical to: copy from source container to host then copy from host to target container.
 
 #####Permissions
 Since ```dkrcp``` wraps ```docker cp``` it applies file system permissions according to ```docker cp``` semantics.  ```docker cp``` currently replaces Linux ```UID:GID``` file system settings with the ```UID:GID``` of the account executing ```docker cp``` when copying from a container.  It then reverses this behavior when copying to a TARGET container, by replacing both the SOURCE ```UID:GID``` with the Linux root ID ('1').  Caution should be exercised as these permission semantics will eliminate custom ```UID:GID``` settings applied to SOURCE or TARGET file system objects.  The same permission semantics apply to images.  
 
 #####follow-link
-(```--follow-link,-L```)'s usual behavior replaces a symbolic link with with a physical copy of it's dereferenced object.  When coupled with ```cp -aL``` link replacement occurs for every element of the recursively produced list of subdirectories/files for a SOURCE argument that's a directory.  Currently, ```dkrcp```'s limits ```--follow-link``` behavior to only those symbolic links specified as SOURCE arguments.  Therefore, a SOURCE argument referencing a symbolic link that's associated to file is replaced by a copy of the file with similar behavior applied to a SOURCE argument symbolic link associated to a directory.  However, in situations involving a SOURCE argument referencing a symbolically linked directory or an actual one, ```dkrcp``` eschews typical ```--forward-link``` behavior by failing to replace symbolic links of the SOURCE directory's recursively enumerated file and subdirectory symbolic links.  This behavior demonstrated below mirrors the current [design](https://github.com/docker/docker/issues/21146) of ```docker cp --follow-link```. 
+(```--follow-link,-L```)'s usual behavior replaces a symbolic link with with a physical copy of it's dereferenced object.  When coupled with ```cp -aL``` link replacement occurs for every element of the recursively produced list of subdirectories/files for a SOURCE argument that's a directory.  Currently, ```dkrcp```'s limits ```--follow-link``` behavior to only those symbolic links specified as SOURCE arguments.  Therefore, a SOURCE argument referencing a symbolic link that's associated to file is replaced by a copy of the file with similar behavior applied to a SOURCE argument symbolic link associated to a directory.  However, in situations involving a SOURCE argument referencing a symbolically linked directory or an actual one, ```dkrcp``` eschews typical ```--forward-link``` behavior by preserving, instead of replacing, symbolic links of the SOURCE directory's recursively enumerated file and subdirectory symbolic links.  This behavior demonstrated below mirrors the current [design](https://github.com/docker/docker/issues/21146) of ```docker cp --follow-link```. 
 ```
 # host 'xlink' is a symbolic link to a directory.  this directory also contains
 # a symbolic link named 'xfilelink'. 
@@ -154,7 +153,7 @@ a40380dd84173f3806b706dc06548364fb789f8a06dd5797f389d2674ad779f0
 # add desired metadata settings.
 
 Ex: 2
-# copy a statically linked golang executable from an image derived FROM by Docker's
+# copy a statically linked golang executable from an image derived FROM Docker's
 # golang:onbuild image.  golang static link options for this example aren't
 # necessary, as the code does not depend on dynamic golang components.
 #
@@ -170,7 +169,7 @@ Ex: 2
 #
 #       fmt.Println("Hello World!")
 #   }
-#
+
 # run docker build:
 
 > docker build -t myhelloworld .
@@ -199,10 +198,10 @@ Hello World!
   * Select/create the desired directory to contain this project's git repository.
   * Use ```cd``` command to make this directory current.
   * Depending on what you wish to install execute:
-    * [```git clone```](https://help.github.com/articles/cloning-a-repository/) to copy entire project contents including the git repository.  Obtains current master which may include untested features.  To synchronize the working directory to reflect the desired release, use ```git checkout tags/<tag_name>```.
+    * [```git clone```](https://help.github.com/articles/cloning-a-repository/) to copy entire project contents including its git repository.  Obtains current master which may include untested features.  To synchronize the working directory to reflect the desired release, use ```git checkout tags/<tag_name>```.
     * [```git archive```](https://www.kernel.org/pub/software/scm/git/docs/git-archive.html) to copy only the necessary project files without the git repository.  Archive can be selective by specifying tag or branch name.
     *  wget https://github.com/whisperingchaos/dkrcp/zipball/master creates a zip that includes only the project files without the git repository.  Obtains current master branch which may include untested features.
-  * Selectively add the 'dkrcp' alias to the current shell by running ```source```[```alias_Install.sh```](https://github.com/WhisperingChaos/dkrcp/blob/master/alias_Install.sh).
+  * Selectively add the 'dkrcp' alias to the current shell by running ```source```[```./alias_Install.sh```](https://github.com/WhisperingChaos/dkrcp/blob/master/alias_Install.sh).
  
 #####Development Environment
   * Ubuntu 12.04
