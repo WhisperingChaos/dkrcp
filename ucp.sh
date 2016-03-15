@@ -55,7 +55,7 @@ function VirtCmmdArgumentsParse () {
 VirtCmmdConfigSetDefault () {
   REG_EX_UUID='^(sha256:)?[a-fA-F0-9]+'
   DIGEST_ID_PREFIX='sha256:'
-  REG_EX_REPOSITORY_NAME_UUID='^([a-z0-9]([._-]?[a-z0-9]+)*/)*(sha256:)?[a-z0-9]([._-]?[a-z0-9]+)*(:[A-Za-z0-9._-]*)?'
+  REG_EX_REPOSITORY_NAME_UUID='^([a-z0-9]([._-]?[a-z0-9]+)*/)*(sha256:)?[a-z0-9]([a-z0-9._-]+)*(:[A-Za-z0-9._-]*)?'
   REG_EX_CONTAINER_NAME_UUID='^[a-zA-Z0-9][a-zA-Z0-9_.-]*'
   local -r tempDir="$(dirname "$(mktemp -u)")"
   if [ -z "$tempDir" ]; then 
@@ -1352,7 +1352,9 @@ cp_complex(){
     if ! eval docker cp $dockerCpOpts \-\- \"\$sourceArgDocker\" \"\$tmpHostRefTarget\"\>\/dev\/null; then
       break
     fi
-    if ! eval docker cp $dockerCpOpts \-\- \"\$tmpHostRefSource\" \"\$targetArgDocker\"; then
+    # $dockerCpOpts not currently required as only --forwarding-link is supported.
+    # this option's behavior was already realized by the prior cp.
+    if ! docker cp "$tmpHostRefSource" "$targetArgDocker"; then
       break
     fi
     successCopy='true'
