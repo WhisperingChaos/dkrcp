@@ -6,7 +6,7 @@ Copy files between host's file system, containers, and images.
 &nbsp;&nbsp;&nbsp;&nbsp;[Interweaved Copying](#interweaved-copying)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Permissions](#permissions)  
 &nbsp;&nbsp;&nbsp;&nbsp;[follow-link](#follow-link)  
-&nbsp;&nbsp;&nbsp;&nbsp;[follow-link](#examples)  
+&nbsp;&nbsp;&nbsp;&nbsp;[Examples](#examples)  
 [Installing](#install)  
 [Testing](#testing)  
 [Motivation](#motivation)
@@ -25,7 +25,6 @@ Usage:  [OPTIONS] SOURCE [SOURCE]... TARGET
   <relativepath> within the context of a container/image is relative to
   container's/image's '/' (root).
 
-OPTIONS:
 OPTIONS:
     --ucpchk-reg=false        Don't pull images from registry. Limits image name
                                 resolution to Docker local repository for  
@@ -170,7 +169,7 @@ Ex: 2
 #
 #       fmt.Println("Hello World!")
 #   }
-#
+
 # run docker build:
 
 > docker build -t myhelloworld .
