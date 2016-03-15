@@ -1324,13 +1324,15 @@ cp_complex(){
     # only one error message that can be recovered from and it is issued by the second docker cp command,
     # these other messages can be safely ignored as the return code will reflect any failure in the pipleline.
     # not meant to be used outside its enclosing function.
-    eval docker cp $dockerCpOpts \-\- \"\$sourceArgDocker\" - 2>/dev/null | docker cp  - "$targetArgDocker"
+    eval docker cp $dockerCpOpts \-\- \"\$sourceArgDocker\" \- \2\>\/dev\/null | docker cp  - "$targetArgDocker"
   }
   if dockedMsg="$(docker_stream_Copy "$dockerCpOpts" "$sourceArgDocker" "$targetArgDocker" 2>&1 )"; then
     return
   fi
   if ! [[ $dockedMsg =~ ^destination.+must.be.a.directory ]]; then
-    echo "$dockedMsg">&2
+    # message maybe null because initial streamed cp failed and its output was suppressed to
+    # slience broken pipe message
+    if [ -n "$dockedMsg"] && ! [[ $dockedMsg =~ ^$ ]]; then echo "hi:$dockedMsg">&2; fi
     ScriptUnwind "$LINENO" "Unexpected failure detected during streamed,piped docker cp from: '$sourceArgDocker', to: '$targetArgDocker'."
   fi
   # unable to stream, convert into two simpler docker cp commands.
