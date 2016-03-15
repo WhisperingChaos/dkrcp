@@ -56,7 +56,7 @@ Supplements [```docker cp```](https://docs.docker.com/engine/reference/commandli
 
 are all applicable to ```dkrcp```.
 
-However, the following tabular form offers an equivalent description of copy behavior but visually different than the document ion associated to ```docker cp```.
+However, the following tabular form offers an equivalent description of copy behavior but visually different than the documention associated to ```docker cp```.
 
 |         | SOURCE File  | SOURCE Directory | [SOURCE Directory Content](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#source-directory-content-an-existing-directory-path-appended-with-) | SOURCE Stream |
 | :--:    | :----------: | :---------:| :----------: | :----------: |
@@ -82,7 +82,7 @@ Since copying to an existing TARGET image first applies this operation to a deri
 ######Copy *from* an *existing image*:
   * Convert the referenced image to a container via [```docker create```](https://docs.docker.com/engine/reference/commandline/create).
   * Copy from this container using ```docker cp```.
-  * Destroy this container using ```docker rm```.
+  * Destroy this container using [```docker rm```](https://docs.docker.com/engine/reference/commandline/rm/).
 
 ######Copy *to* an *existing image*:
   * Convert the referenced image to a container via ```docker create```.
@@ -99,15 +99,15 @@ Since copying to an existing TARGET image first applies this operation to a deri
   * Continue with [Copy *to* an *existing image*](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#copy-to-an-existing-image).
 
 #####Interweaved Copying
-The behavior of ```dkrcp``` in situations where the same container assumes both SOURCE and TARGET roles is undefined and may change.  Preliminary testing indicates that non-overlapping directory references are copied as expected.  In fact, a fully overlapping root to root copy operation succeeds but no time has been invested to determine its correctness.  Therefore, exercise caution when copying between the same SOURCE and TARGET containers.  Fortunately copy operations involving the same SOURCE and TARGET image avert this uncertainty.
+The behavior of ```dkrcp``` in situations where the same container assumes both SOURCE and TARGET roles is undefined and may change.  Preliminary testing indicates that non-overlapping directory references are copied as expected.  In fact, a fully overlapping root to root copy operation succeeds but no time has been invested to determine its correctness.  Therefore, exercise caution when copying between the same SOURCE and TARGET containers.  Copy operations involving the same SOURCE and TARGET image fortunately avert this uncertainty.
 
-When operating on the same SOURCE and TARGET image, ```dkrcp``` converts both to independent container instances.  The use of independent container prevents entanglement of the copy streams.  Therefore ```dkrcp```'s behavior should be identical to: copy from source container to host then copy from host to target container.
+When operating on the same SOURCE and TARGET image, ```dkrcp``` converts both to independent container instances.  The use of independent container prevents entanglement of the copy streams.  Therefore ```dkrcp```'s behavior (not its implementation) should be identical to: copy from source container to host then copy from host to target container.
 
 #####Permissions
 Since ```dkrcp``` wraps ```docker cp``` it applies file system permissions according to ```docker cp``` semantics.  ```docker cp``` currently replaces Linux ```UID:GID``` file system settings with the ```UID:GID``` of the account executing ```docker cp``` when copying from a container.  It then reverses this behavior when copying to a TARGET container, by replacing both the SOURCE ```UID:GID``` with the Linux root ID ('1').  Caution should be exercised as these permission semantics will eliminate custom ```UID:GID``` settings applied to SOURCE or TARGET file system objects.  The same permission semantics apply to images.  
 
 #####follow-link
-(```--follow-link,-L```)'s usual behavior replaces a symbolic link with with a physical copy of it's dereferenced object.  When coupled with ```cp -aL``` link replacement occurs for every element of the recursively produced list of subdirectories/files for a SOURCE argument that's a directory.  Currently, ```dkrcp```'s limits ```--follow-link``` behavior to only those symbolic links specified as SOURCE arguments.  Therefore, a SOURCE argument referencing a symbolic link that's associated to file is replaced by a copy of the file with similar behavior applied to a SOURCE argument symbolic link associated to a directory.  However, in situations involving a SOURCE argument referencing a symbolically linked directory or an actual one, ```dkrcp``` eschews typical ```--forward-link``` behavior by failing to replace symbolic links of the SOURCE directory's recursively enumerated file and subdirectory symbolic links.  This behavior demonstrated below mirrors the current [design](https://github.com/docker/docker/issues/21146) of ```docker cp --follow-link```. 
+(```--follow-link,-L```)'s usual behavior replaces a symbolic link with with a physical copy of it's dereferenced object.  When coupled with ```cp -aL``` link replacement occurs for every element of the recursively produced list of subdirectories/files for a SOURCE argument that's a directory.  Currently, ```dkrcp```'s limits ```--follow-link``` behavior to only those symbolic links specified as SOURCE arguments.  Therefore, a SOURCE argument referencing a symbolic link that's associated to file is replaced by a copy of the file with similar behavior applied to a SOURCE argument symbolic link associated to a directory.  However, in situations involving a SOURCE argument referencing a symbolically linked directory or an actual one, ```dkrcp``` eschews typical ```--forward-link``` behavior by preserving, instead of replacing, symbolic links of the SOURCE directory's recursively enumerated file and subdirectory symbolic links.  This behavior demonstrated below mirrors the current [design](https://github.com/docker/docker/issues/21146) of ```docker cp --follow-link```. 
 ```
 # host 'xlink' is a symbolic link to a directory.  this directory also contains
 # a symbolic link named 'xfilelink'. 
