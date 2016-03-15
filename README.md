@@ -153,7 +153,7 @@ a40380dd84173f3806b706dc06548364fb789f8a06dd5797f389d2674ad779f0
 # add desired metadata settings.
 
 Ex: 2
-# copy a statically linked golang executable from an image derived FROM by Docker's
+# copy a statically linked golang executable from an image derived FROM Docker's
 # golang:onbuild image.  golang static link options for this example aren't
 # necessary, as the code does not depend on dynamic golang components.
 #
