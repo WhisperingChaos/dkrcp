@@ -6,6 +6,7 @@ Copy files between host's file system, containers, and images.
 &nbsp;&nbsp;&nbsp;&nbsp;[Interweaved Copying](#interweaved-copying)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Permissions](#permissions)  
 &nbsp;&nbsp;&nbsp;&nbsp;[follow-link](#follow-link)  
+&nbsp;&nbsp;&nbsp;&nbsp;[follow-link](#examples)  
 [Installing](#install)  
 [Testing](#testing)  
 [Motivation](#motivation)
@@ -107,7 +108,7 @@ When operating on the same SOURCE and TARGET image, ```dkrcp``` converts both to
 Since ```dkrcp``` wraps ```docker cp``` it applies file system permissions according to ```docker cp``` semantics.  ```docker cp``` currently replaces Linux ```UID:GID``` file system settings with the ```UID:GID``` of the account executing ```docker cp``` when copying from a container.  It then reverses this behavior when copying to a TARGET container, by replacing both the SOURCE ```UID:GID``` with the Linux root ID ('1').  Caution should be exercised as these permission semantics will eliminate custom ```UID:GID``` settings applied to SOURCE or TARGET file system objects.  The same permission semantics apply to images.  
 
 #####follow-link
-(```--follow-link,-L```)'s usual behavior replaces a symbolic link with with a physical copy of it's dereferenced object.  When coupled with ```cp -aL``` link replacement occurs for every element of the recursively produced list of subdirectories/files for a SOURCE argument that's a directory.  Currently, ```dkrcp```'s limits ```--follow-link``` behavior to only those symbolic links specified as SOURCE arguments.  Therefore, a SOURCE argument referencing a symbolic link that's associated to file is replaced by a copy of the file with similar behavior applied to a SOURCE argument symbolic link associated to a directory.  However, in situations involving a SOURCE argument referencing a symbolically linked directory, ```dkrcp``` eschews typical ```--forward-link``` behavior by failing to replace symbolic links of the SOURCE directory's recursively enumerated file and subdirectory symbolic links.  This behavior 
+(```--follow-link,-L```)'s usual behavior replaces a symbolic link with with a physical copy of it's dereferenced object.  When coupled with ```cp -aL``` link replacement occurs for every element of the recursively produced list of subdirectories/files for a SOURCE argument that's a directory.  Currently, ```dkrcp```'s limits ```--follow-link``` behavior to only those symbolic links specified as SOURCE arguments.  Therefore, a SOURCE argument referencing a symbolic link that's associated to file is replaced by a copy of the file with similar behavior applied to a SOURCE argument symbolic link associated to a directory.  However, in situations involving a SOURCE argument referencing a symbolically linked directory or an actual one, ```dkrcp``` eschews typical ```--forward-link``` behavior by failing to replace symbolic links of the SOURCE directory's recursively enumerated file and subdirectory symbolic links.  This behavior demonstrated below mirrors the current [design](https://github.com/docker/docker/issues/21146) of ```docker cp --follow-link```. 
 ```
 # host 'xlink' is a symbolic link to a directory.  this directory also contains
 # a symbolic link named 'xfilelink'. 
@@ -135,6 +136,58 @@ drwxr-xr-x   18 root     root          4096 Mar 14 19:56 ..
 -rw-r--r--    1 root     root             0 Mar 14 19:35 xfile
 lrwxrwxrwx    1 root     root             8 Mar 14 19:42 xfilelink -> /x/xfile
 ```
+#####Examples
+
+```
+Ex: 1
+# squash/compact an existing image:
+#
+# > dkrcp <image_name_existing>[:<tag_name>]:: <image_name_new>[:tag_name]::
+
+> dkrcp --change 'ENTRYPOINT bash' ubuntu:14.04:: ubuntu_squashed:14.04::
+a40380dd84173f3806b706dc06548364fb789f8a06dd5797f389d2674ad779f0
+
+# above will reduce N layers to at most 2.  significant reduction in size
+# experienced only when layers 1 through N-1 in exising image contain
+# 'logically removed' file references.  when creating a new image, the
+# existing image's metadata is not inherited.  use --change option to
+# add desired metadata settings.
+
+Ex: 2
+# copy a statically linked golang executable from an image derived FROM by Docker's
+# golang:onbuild image.  golang static link options for this example aren't
+# necessary, as the code does not depend on dynamic golang components.
+#
+# Dockerfile:
+#   FROM  library/golang:onbuild
+#
+# myhelloworld.go:
+#   package main
+#
+#   import "fmt"
+#
+#   func main() {
+#
+#       fmt.Println("Hello World!")
+#   }
+#
+# run docker build:
+
+> docker build -t myhelloworld .
+
+# resulting 'myhelloworld' image size ~ 746MB
+
+# copy self contained myhelloworld (app) executable to new image named 'myhelloworldmin':
+
+> dkrcp --change 'ENTRYPOINT ["/myhelloworld"]' myhelloworld::/go/bin/app myhelloworldmin::/myhelloworld
+1e620ba6804f077712156730ec15c625cfee2cea26c5708f8d14f66a2377e241
+
+# resulting 'myhelloworldmin:latest' image size ~2.3MB: ~ 300x < 'myhelloworld'
+
+> docker run --rm myhelloworldmin
+Hello World!
+
+```
 
 ####Install
 #####Dependencies
@@ -146,7 +199,7 @@ lrwxrwxrwx    1 root     root             8 Mar 14 19:42 xfilelink -> /x/xfile
   * Select/create the desired directory to contain this project's git repository.
   * Use ```cd``` command to make this directory current.
   * Depending on what you wish to install execute:
-    * ```git clone``` to copy entire project contents including the git repository.  Obtains current master which may include untested features.
+    * [```git clone```](https://help.github.com/articles/cloning-a-repository/) to copy entire project contents including the git repository.  Obtains current master which may include untested features.  To synchronize the working directory to reflect the desired release, use ```git checkout tags/<tag_name>```.
     * [```git archive```](https://www.kernel.org/pub/software/scm/git/docs/git-archive.html) to copy only the necessary project files without the git repository.  Archive can be selective by specifying tag or branch name.
     *  wget https://github.com/whisperingchaos/dkrcp/zipball/master creates a zip that includes only the project files without the git repository.  Obtains current master branch which may include untested features.
   * Selectively add the 'dkrcp' alias to the current shell by running ```source```[```alias_Install.sh```](https://github.com/WhisperingChaos/dkrcp/blob/master/alias_Install.sh).
@@ -177,10 +230,10 @@ Execution of ```dkrcp```'s test program: ```dkrcp_Test.sh```, ensures its proper
 ####Motivation
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application when creating the runtime image.
     * Use one or more Dockerfiles to generate the artifacts needed by the application.
-    * Use ```dkrcp``` to copy the desired runtime artifacts from these containers/images and create the essential runtime image.
+    * Use ```dkrcp``` to copy the desired runtime artifacts from these containers/images and create the *essential* runtime image.
   * Facilitates building applications by pipelines that gradually incorporate Docker containers.
     *  Existing build pipelines can replace locally installed build tool chains with Docker Hub provided build tool chain images, such as [golang](https://hub.docker.com/_/golang/).  The Docker Hub containerized versions potentially eliminate the need to physically install/configure a locally hosted tool chain and fully isolate build processes to ensure their repeatability.  Once a containerized build process completes, its desired artifacts can then be transferred from the resultant container/image to a host file result directory using ```dkrcp```.
-  * Encapsulates the reliance on and encoding of several Docker CLI calls to implement the desired functionality insulating automation incorporating this utility from potentially future improved support by Docker community members through dkrcp's interface.
+  * Encapsulates the reliance on and encoding of several Docker CLI calls to implement the desired functionality insulating automation employing this utility from potentially future improved support by Docker community members through dkrcp's interface.
 
 ###License
 
