@@ -54,7 +54,9 @@ TestHelpCmmdUsageDisplay(){
 ###############################################################################
 VirtCmmdVersionDisplay(){
   echo 'Version : 0.5'
-  echo 'Requires: bash 4.0+, Docker Client 1.8+'
+  echo 'Requires: bash 4.0+, Docker Client 1.8+, jq 1.5'
+  echo 'Issues  : https://github.com/WhisperingChaos/dkrcp/issues'
+  echo 'License : The MIT License (MIT) Copyright (c) 2014-2016 Richard Moyse License@Moyse.US'
 }
 ###############################################################################
 ##
@@ -68,6 +70,7 @@ TestEnvironentDependenciesAssert(){
   ! TestDependenciesScanSuccess 'dkrcp_dependency_define_Diff'          '3.0'   && depndSuccess='false'
   ! TestDependenciesScanSuccess 'Testdependency_define_Bash'            '4.0'   && depndSuccess='false'
   ! TestDependenciesScanSuccess 'dkrcp_dependency_dkrcp'                '0.5'   && depndSuccess='false'
+  ! TestDependenciesScanSuccess 'dkrcp_dependency_define_jq'            '1.5'   && depndSuccess='false'
   ! TestLocalRepositoryIsEmpty && depndSuccess='false'
   ! $depndSuccess && ScriptUnwind "$LINENO" "Detected problematic dependencies.  Repair or try '--no-depend'."
   true
@@ -90,7 +93,7 @@ dkrcp_dependency_define_Docker_Client(){
 ###############################################################################
 ##
 ##  Purpose:
-##    dkrcp relies on 'diff' to verify cp operation.
+##    dkrcp_Test.sh relies on 'diff' to verify cp operation.
 ##
 ##  see interface definition: TestFramework.sh -> TestDependenciesScanSuccess
 ##
@@ -110,7 +113,26 @@ dkrcp_dependency_define_Diff(){
     ScriptError "Requires 'diff' with -q option: report on files only if different."
   }
 }
-
+###############################################################################
+##
+##  Purpose:
+##    dkrcp_Test.sh relies on 'jq' to verify cp operation.
+##
+##  see interface definition: TestFramework.sh -> TestDependenciesScanSuccess
+##
+###############################################################################
+dkrcp_dependency_define_jq(){
+  dependency_Exist(){
+    jq --version >/dev/null 2>/dev/null
+  }
+  dependency_version_Get(){
+    local -r jqversion="$( jq --version )"
+    echo "${jqversion:3}"
+  }
+  dependency_version_Violation_Gen(){
+    ScriptError "Requires 'jq' version: '$1', detected: '$2'."
+  }
+}
 ###############################################################################
 ##
 ##  Purpose:
@@ -132,7 +154,7 @@ dkrcp_dependency_dkrcp(){
     fi
   }
   dependency_version_Violation_Gen(){
-    ScriptError "Requires 'dkrcp' of version: '$1', detected: '$2'."
+    ScriptError "Requires 'dkrcp' version: '$1', detected: '$2'."
   }
 }
 ###############################################################################
