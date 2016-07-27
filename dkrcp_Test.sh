@@ -53,7 +53,7 @@ TestHelpCmmdUsageDisplay(){
 ##
 ###############################################################################
 VirtCmmdVersionDisplay(){
-  echo 'Version : 0.5'
+  echo 'Version : 0.6'
   echo 'Requires: bash 4.0+, Docker Client 1.8+, jq 1.5'
   echo 'Issues  : https://github.com/WhisperingChaos/dkrcp/issues'
   echo 'License : The MIT License (MIT) Copyright (c) 2014-2016 Richard Moyse License@Moyse.US'
@@ -69,7 +69,7 @@ TestEnvironentDependenciesAssert(){
   ! TestDependenciesScanSuccess 'dkrcp_dependency_define_Docker_Client' '1.8.0' && depndSuccess='false'
   ! TestDependenciesScanSuccess 'dkrcp_dependency_define_Diff'          '3.0'   && depndSuccess='false'
   ! TestDependenciesScanSuccess 'Testdependency_define_Bash'            '4.0'   && depndSuccess='false'
-  ! TestDependenciesScanSuccess 'dkrcp_dependency_dkrcp'                '0.5'   && depndSuccess='false'
+  ! TestDependenciesScanSuccess 'dkrcp_dependency_dkrcp'                '0.6'   && depndSuccess='false'
   ! TestDependenciesScanSuccess 'dkrcp_dependency_define_jq'            '1.5'   && depndSuccess='false'
   ! TestLocalRepositoryIsEmpty && depndSuccess='false'
   ! $depndSuccess && ScriptUnwind "$LINENO" "Detected problematic dependencies.  Repair or try '--no-depend'."
