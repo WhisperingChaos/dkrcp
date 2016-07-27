@@ -91,7 +91,7 @@ function AssociativeMapToBuffer () {
 ##    pairs are ordered from first/leftmost to last/rightmost.
 ##
 ##  Inputs:
-##    $1 - Buffer contaiing array serialize in format described above.
+##    $1 - Buffer containing array serialize in format described above.
 ##    $2 - Variable name to bash associative array that will be assigned
 ##         the key value pairs located in the serialized buffer.
 ##         Note - This routine preserves key value pairs that already
