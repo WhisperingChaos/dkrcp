@@ -221,7 +221,7 @@ HELP_DOC
 VirtCmmdVersionDisplay () {
 cat <<VERSION_DOC
 
-Version : 0.5
+Version : 0.6
 Requires: bash 4.0+, Docker Client 1.8+
 Issues  : https://github.com/WhisperingChaos/dkrcp/issues
 License : The MIT License (MIT) Copyright (c) 2014-2016 Richard Moyse License@Moyse.US
