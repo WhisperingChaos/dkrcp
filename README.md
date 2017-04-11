@@ -1,6 +1,6 @@
 # dkrcp
 Copy files between host's file system, containers, and images.
-##### ToC
+### ToC
 [Copy Semantics](#copy-semantics)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Images as SOURCE/TARGET](#images-as-sourcetarget)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Interweaved Copying](#interweaved-copying)  
