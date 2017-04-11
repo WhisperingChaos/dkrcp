@@ -1,6 +1,6 @@
 # dkrcp
 Copy files between host's file system, containers, and images.
-#####ToC
+##### ToC
 [Copy Semantics](#copy-semantics)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Images as SOURCE/TARGET](#images-as-sourcetarget)  
 &nbsp;&nbsp;&nbsp;&nbsp;[Interweaved Copying](#interweaved-copying)  
@@ -79,12 +79,12 @@ When processing image arguments, ```dkrcp``` prefers binding to images known loc
 
 Since copying to an existing TARGET image first applies this operation to a derived container (an image replica), its effects are "reversible".  Failures involving existing images simply delete the derived container leaving the repository unchanged.  However, when adding a new image to the local repository, the repository's state is first updated to reflect a [```scratch```](https://docs.docker.com/engine/userguide/eng-image/baseimages/#creating-a-simple-base-image-using-scratch) version of the image.  This ```scratch``` image is then updated in the same way as any existing TARGET image.  In this situation, a failure removes both the container and ```scratch``` image reverting the local repository's state.
 
-######Copy *from* an *existing image*:
+###### Copy *from* an *existing image*:
   * Convert the referenced image to a container via [```docker create```](https://docs.docker.com/engine/reference/commandline/create).
   * Copy from this container using ```docker cp```.
   * Destroy this container using [```docker rm```](https://docs.docker.com/engine/reference/commandline/rm/).
 
-######Copy *to* an *existing image*:
+###### Copy *to* an *existing image*:
   * Convert the referenced image to a container via ```docker create```.
   * Copy to this container using ```docker cp```.
     * When both the SOURCE and TARGET involve containers, the initial copy strategy streams ```docker cp``` output of the SOURCE container to a receiving ```docker cp``` that accepts this output as its input to the TARGETed container.  As long as the TARGET references an existing directory, the copy succeeds completing the operation.  However, if this copy strategy should fail, a second strategy executes a series of ```docker cp``` operations.  The first copy in this series, replicates the SOURCE artifacts to a temporary directory in the host environment executing ```dkrcp```.  A second ```docker cp``` then relays this SOURCE replica to the TARGET container.
@@ -94,19 +94,19 @@ Since copying to an existing TARGET image first applies this operation to a deri
   * If copy fails, ```dkrcp``` bypasses the commit.
   * Destroy this container using ```docker rm```.
 
-######Copy *to create* an *image*:
+###### Copy *to create* an *image*:
   * Execute a ```docker build``` using [```FROM scratch```](https://docs.docker.com/engine/userguide/eng-image/baseimages/#creating-a-simple-base-image-using-scratch).
   * Continue with [Copy *to* an *existing image*](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#copy-to-an-existing-image).
 
-#####Interweaved Copying
+##### Interweaved Copying
 The behavior of ```dkrcp``` in situations where the same container assumes both SOURCE and TARGET roles is undefined and may change.  Preliminary testing indicates that non-overlapping directory references are copied as expected.  In fact, a fully overlapping root to root copy operation succeeds but no time has been invested to determine its correctness.  Therefore, exercise caution when copying between the same SOURCE and TARGET containers.  Copy operations involving the same SOURCE and TARGET image fortunately avert this uncertainty.
 
 When operating on the same SOURCE and TARGET image, ```dkrcp``` converts both to independent container instances.  The use of independent containers prevents possible entanglement of the copy streams.  Therefore ```dkrcp```'s behavior (not its implementation) should be identical to: copy from source container to host then copy from host to target container.
 
-#####Permissions
+##### Permissions
 Since ```dkrcp``` wraps ```docker cp``` it applies file system permissions according to ```docker cp``` semantics.  ```docker cp``` currently replaces Linux ```UID:GID``` file system settings with the ```UID:GID``` of the account executing ```docker cp``` when copying from a container.  It then reverses this behavior when copying to a TARGET container, by replacing both the SOURCE ```UID:GID``` with the Linux root ID ('0:0').  Caution should be exercised as these permission semantics will eliminate custom ```UID:GID``` settings applied to SOURCE or TARGET file system objects.  The same permission semantics apply to images.  
 
-#####follow-link
+##### follow-link
 (```--follow-link,-L```)'s usual behavior replaces a symbolic link with with a physical copy of it's dereferenced object.  When coupled with ```cp -aL``` link replacement occurs for every element of the recursively produced list of subdirectories/files for a SOURCE argument that's a directory.  Currently, ```dkrcp```'s limits ```--follow-link``` behavior to only those symbolic links specified as SOURCE arguments.  Therefore, a SOURCE argument referencing a symbolic link that's associated to file is replaced by a copy of the file with similar behavior applied to a SOURCE argument symbolic link associated to a directory.  However, in situations involving a SOURCE argument referencing a symbolically linked directory or an actual one, ```dkrcp``` eschews typical ```--forward-link``` behavior by preserving, instead of replacing, symbolic links of the SOURCE directory's recursively enumerated file and subdirectory symbolic links.  This behavior demonstrated below mirrors the current [design](https://github.com/docker/docker/issues/21146) of ```docker cp --follow-link```. 
 ```
 # host 'xlink' is a symbolic link to a directory.  this directory also contains
@@ -135,7 +135,7 @@ drwxr-xr-x   18 root     root          4096 Mar 14 19:56 ..
 -rw-r--r--    1 root     root             0 Mar 14 19:35 xfile
 lrwxrwxrwx    1 root     root             8 Mar 14 19:42 xfilelink -> /x/xfile
 ```
-#####Examples
+##### Examples
 
 ```
 Ex: 1
@@ -188,12 +188,12 @@ Hello World!
 
 ```
 
-####Install
-#####Dependencies
+#### Install
+##### Dependencies
   * GNU Bash 4.0+
   * Docker Engine 1.8+
 
-#####Instructions
+##### Instructions
 
   * Select/create the desired directory to contain this project's git repository.
   * Use ```cd``` command to make this directory current.
@@ -203,15 +203,15 @@ Hello World!
     *  wget https://github.com/whisperingchaos/dkrcp/zipball/master creates a zip that includes only the project files without the git repository.  Obtains current master branch which may include untested features.
   * Selectively add the 'dkrcp' alias to the current shell by running ```source```[```./alias_Install.sh```](https://github.com/WhisperingChaos/dkrcp/blob/master/alias_Install.sh).
  
-#####Development Environment
+##### Development Environment
   * Ubuntu 12.04
   * GNU Bash 4.2.25(1)-release
   * Docker Engine 1.9.1
   * [jq 1.5](https://stedolan.github.io/jq)
 
-####Testing
+#### Testing
 Execution of ```dkrcp```'s test program: ```dkrcp_Test.sh```, ensures its proper operation within its installed host environment.  Since ```dkrcp_Test.sh``` must affect the local repository to verify ```dkrcp```'s operation, it first performs a scan of the local environment to determine if its produced artifacts overlap existing file system and Docker repository ones.  The scan operation will generate a report and terminate testing upon detection of overlapping artifacts.  Please note that all testing artifact names begin with the ```dkrcp_test``` namespace, so it's unlikely image or file names in the host environment will collide with ones generated during testing.
-#####Test Dependencies
+##### Test Dependencies
   *  [```dkrcp``` Dependencies](#dependencies)
   *  jq 1.5
 ```
@@ -226,7 +226,7 @@ Execution of ```dkrcp```'s test program: ```dkrcp_Test.sh```, ensures its proper
 
 ```
 
-####Motivation
+#### Motivation
   * Promotes smaller images and potentially minimizes their attack surface by selectively copying only those resources required to run the containerized application when creating the runtime image.
     * Use one or more Dockerfiles to generate the artifacts needed by the application.
     * Use ```dkrcp``` to copy the desired runtime artifacts from these containers/images and create the *essential* runtime image.
@@ -235,7 +235,7 @@ Execution of ```dkrcp```'s test program: ```dkrcp_Test.sh```, ensures its proper
     *  Existing build pipelines can replace locally installed build tool chains with Docker Hub provided build tool chain images, such as [golang](https://hub.docker.com/_/golang/).  The Docker Hub containerized versions potentially eliminate the need to physically install/configure a locally hosted tool chain and fully isolate build processes to ensure their repeatability.  Once a containerized build process completes, its desired artifacts can then be transferred from the resultant container/image to a host file result directory using ```dkrcp```.
   * Encapsulates the reliance on and encoding of several Docker CLI calls to implement the desired functionality insulating automation employing this utility from potentially future improved support by Docker community members through dkrcp's interface.
 
-###License
+### License
 
 The MIT License (MIT) Copyright (c) 2015-2016 Richard Moyse License@Moyse.US
 
@@ -243,6 +243,6 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-###Legal Notice
+### Legal Notice
 
 Docker and the Docker logo are trademarks or registered trademarks of Docker, Inc. in the United States and/or other countries. Docker, Inc. and other parties may also have trademark rights in other terms used herein.
