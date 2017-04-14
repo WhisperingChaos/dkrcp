@@ -66,9 +66,9 @@ However, the following tabular form offers an equivalent description of copy beh
 | **TARGET exists as directory.** | Copy SOURCE to TARGET. | Copy SOURCE to TARGET. | Copy SOURCE content to TARGET. | Copy File/Directory to TARGET. |
 | **[TARGET assumed directory](https://github.com/WhisperingChaos/dkrcp/blob/master/README.md#target-assumed-directory-the-rightmost-last-name-of-a-specified-path-suffixed-by---it-is-assumed-to-reference-an-existing-directory) doesn't exist but its parent directory does.** | Error | Copy SOURCE content to TARGET. | Copy SOURCE content to TARGET. | Error |
 
-######TARGET assumed directory: The rightmost, last, name of a specified [path](https://en.wikipedia.org/wiki/Path_%28computing%29) suffixed by '/' - indicative of a directory.
+###### TARGET assumed directory: The rightmost, last, name of a specified [path](https://en.wikipedia.org/wiki/Path_%28computing%29) suffixed by '/' - indicative of a directory.
 
-######SOURCE Directory Content: An existing directory path appended with '/.'.
+###### SOURCE Directory Content: An existing directory path appended with '/.'.
 
 The multi-SOURCE copy semantics simply converge to the row labeled: '**TARGET exists as directory.**' above.  In this situation any SOURCE type, whether it a file, directory, or stream is successfully copied, as long as the TARGET refers to a preexisting directory, otherwise, the operation fails.
 
